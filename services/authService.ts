@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, UserRole } from '@/types/user';
+import { User } from '@/types/user';
 import { trpcClient } from '@/lib/trpc';
 
 // Auth token storage key
@@ -24,13 +24,13 @@ export const authService = {
   },
   
   // Register new user
-  register: async (userData: { name: string; email: string; phone: string }, password: string): Promise<{ user: User; token: string }> => {
+  register: async (userData: { name: string; email: string; phone: string; password: string }): Promise<{ user: User; token: string }> => {
     try {
       const response = await trpcClient.auth.register.mutate({ 
         name: userData.name,
         email: userData.email,
         phone: userData.phone,
-        password 
+        password: userData.password
       });
       
       // Store auth data

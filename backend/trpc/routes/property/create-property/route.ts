@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { protectedProcedure } from "@/backend/trpc/create-context";
+import { TRPCError } from "@trpc/server";
 
 export const createPropertyProcedure = protectedProcedure
   .input(
@@ -31,12 +32,27 @@ export const createPropertyProcedure = protectedProcedure
   .mutation(async ({ input, ctx }) => {
     try {
       // Create a new property
-      const property = await ctx.db.property.create({
+      const property = await ctx.prisma.property.create({
         data: {
-          ...input,
-          ownerId: ctx.userId,
+          title: input.title,
+          description: input.description,
+          price: input.price,
+          currency: input.currency,
+          type: input.type,
+          listingType: input.listingType,
+          bedrooms: input.bedrooms,
+          bathrooms: input.bathrooms,
+          area: input.area,
+          location: input.location,
+          amenities: input.amenities,
+          images: input.images,
+          featured: input.featured || false,
           views: 0,
-          createdAt: new Date(),
+          owner: {
+            connect: {
+              id: ctx.userId,
+            },
+          },
         },
         include: {
           owner: {
@@ -53,6 +69,8 @@ export const createPropertyProcedure = protectedProcedure
       // Transform the data to match the expected format
       return {
         ...property,
+        createdAt: property.createdAt.toISOString(),
+        updatedAt: property.updatedAt.toISOString(),
         owner: {
           ...property.owner,
           isPremium: property.owner.role === 'premium',
@@ -60,6 +78,9 @@ export const createPropertyProcedure = protectedProcedure
       };
     } catch (error) {
       console.error('Error creating property:', error);
-      throw new Error('Failed to create property');
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to create property',
+      });
     }
   });

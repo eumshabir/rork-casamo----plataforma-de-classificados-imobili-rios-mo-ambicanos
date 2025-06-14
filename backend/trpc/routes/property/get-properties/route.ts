@@ -18,80 +18,93 @@ export const getPropertiesProcedure = publicProcedure
   )
   .query(async ({ input, ctx }) => {
     try {
-      // Get all properties from the in-memory database
-      let properties = Array.from(ctx.db.properties.values());
+      // Build the filter object based on the input
+      const filter: any = {};
       
-      // Apply filters if provided
       if (input) {
         if (input.type) {
-          properties = properties.filter((property: any) => property.type === input.type);
+          filter.type = input.type;
         }
         
         if (input.listingType) {
-          properties = properties.filter((property: any) => property.listingType === input.listingType);
+          filter.listingType = input.listingType;
         }
         
         if (input.province) {
-          properties = properties.filter((property: any) => 
-            property.location && property.location.province === input.province
-          );
+          filter.location = {
+            path: '$.province',
+            equals: input.province,
+          };
         }
         
-        if (input.city) {
-          properties = properties.filter((property: any) => 
-            property.location && property.location.city === input.city
-          );
+        if (input.city && !input.province) {
+          filter.location = {
+            path: '$.city',
+            equals: input.city,
+          };
         }
         
-        if (input.minPrice) {
-          properties = properties.filter((property: any) => property.price >= input.minPrice);
-        }
-        
-        if (input.maxPrice) {
-          properties = properties.filter((property: any) => property.price <= input.maxPrice);
+        if (input.minPrice || input.maxPrice) {
+          filter.price = {};
+          
+          if (input.minPrice) {
+            filter.price.gte = input.minPrice;
+          }
+          
+          if (input.maxPrice) {
+            filter.price.lte = input.maxPrice;
+          }
         }
         
         if (input.minBedrooms) {
-          properties = properties.filter((property: any) => 
-            property.bedrooms && property.bedrooms >= input.minBedrooms
-          );
+          filter.bedrooms = {
+            gte: input.minBedrooms,
+          };
         }
         
         if (input.minBathrooms) {
-          properties = properties.filter((property: any) => 
-            property.bathrooms && property.bathrooms >= input.minBathrooms
-          );
+          filter.bathrooms = {
+            gte: input.minBathrooms,
+          };
         }
         
+        // Amenities filtering is more complex with Prisma
+        // This is a simplified version
         if (input.amenities && input.amenities.length > 0) {
-          properties = properties.filter((property: any) => 
-            property.amenities && input.amenities?.every(amenity => 
-              property.amenities.includes(amenity)
-            )
-          );
+          filter.amenities = {
+            hasEvery: input.amenities,
+          };
         }
       }
       
-      // Sort by creation date (newest first)
-      properties.sort((a: any, b: any) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
+      // Get properties from the database with filters
+      const properties = await ctx.prisma.property.findMany({
+        where: filter,
+        orderBy: {
+          createdAt: 'desc',
+        },
+        include: {
+          owner: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              role: true,
+            },
+          },
+        },
+      });
       
       // Transform the data to match the expected format
-      return properties.map((property: any) => {
-        const owner = ctx.db.users.get(property.ownerId);
-        
-        return {
-          ...property,
-          owner: owner ? {
-            id: owner.id,
-            name: owner.name,
-            phone: owner.phone,
-            role: owner.role,
-            isPremium: owner.role === 'premium',
-          } : null,
-        };
-      });
+      return properties.map((property) => ({
+        ...property,
+        createdAt: property.createdAt.toISOString(),
+        updatedAt: property.updatedAt.toISOString(),
+        owner: {
+          ...property.owner,
+          isPremium: property.owner.role === 'premium',
+        },
+      }));
     } catch (error) {
       console.error('Error fetching properties:', error);
       throw new TRPCError({

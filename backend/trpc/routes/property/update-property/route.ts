@@ -16,9 +16,9 @@ export const updatePropertyProcedure = protectedProcedure
       bathrooms: z.number().optional(),
       area: z.number().optional(),
       location: z.object({
-        province: z.string().optional(),
-        city: z.string().optional(),
-        neighborhood: z.string().optional(),
+        province: z.string(),
+        city: z.string(),
+        neighborhood: z.string(),
         address: z.string().optional(),
         coordinates: z.object({
           latitude: z.number().optional(),
@@ -33,20 +33,20 @@ export const updatePropertyProcedure = protectedProcedure
   .mutation(async ({ input, ctx }) => {
     try {
       // Check if the property exists and belongs to the current user
-      const existingProperty = await ctx.db.property.findUnique({
+      const property = await ctx.prisma.property.findUnique({
         where: {
           id: input.id,
         },
       });
       
-      if (!existingProperty) {
+      if (!property) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Property not found',
         });
       }
       
-      if (existingProperty.ownerId !== ctx.userId) {
+      if (property.ownerId !== ctx.userId) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'You do not have permission to update this property',
@@ -54,13 +54,24 @@ export const updatePropertyProcedure = protectedProcedure
       }
       
       // Update the property
-      const property = await ctx.db.property.update({
+      const updatedProperty = await ctx.prisma.property.update({
         where: {
           id: input.id,
         },
         data: {
-          ...input,
-          id: undefined, // Remove id from the update data
+          title: input.title,
+          description: input.description,
+          price: input.price,
+          currency: input.currency,
+          type: input.type,
+          listingType: input.listingType,
+          bedrooms: input.bedrooms,
+          bathrooms: input.bathrooms,
+          area: input.area,
+          location: input.location,
+          amenities: input.amenities,
+          images: input.images,
+          featured: input.featured,
         },
         include: {
           owner: {
@@ -76,10 +87,12 @@ export const updatePropertyProcedure = protectedProcedure
       
       // Transform the data to match the expected format
       return {
-        ...property,
+        ...updatedProperty,
+        createdAt: updatedProperty.createdAt.toISOString(),
+        updatedAt: updatedProperty.updatedAt.toISOString(),
         owner: {
-          ...property.owner,
-          isPremium: property.owner.role === 'premium',
+          ...updatedProperty.owner,
+          isPremium: updatedProperty.owner.role === 'premium',
         },
       };
     } catch (error) {
@@ -87,6 +100,9 @@ export const updatePropertyProcedure = protectedProcedure
       if (error instanceof TRPCError) {
         throw error;
       }
-      throw new Error('Failed to update property');
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to update property',
+      });
     }
   });

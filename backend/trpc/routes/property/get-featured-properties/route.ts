@@ -4,25 +4,37 @@ import { TRPCError } from "@trpc/server";
 export const getFeaturedPropertiesProcedure = publicProcedure
   .query(async ({ ctx }) => {
     try {
-      // Get featured properties from the in-memory database
-      const properties = Array.from(ctx.db.properties.values())
-        .filter((property: any) => property.featured === true);
+      // Get featured properties from the database
+      const properties = await ctx.prisma.property.findMany({
+        where: {
+          featured: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        include: {
+          owner: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              role: true,
+            },
+          },
+        },
+        take: 10, // Limit to 10 featured properties
+      });
       
       // Transform the data to match the expected format
-      return properties.map((property: any) => {
-        const owner = ctx.db.users.get(property.ownerId);
-        
-        return {
-          ...property,
-          owner: owner ? {
-            id: owner.id,
-            name: owner.name,
-            phone: owner.phone,
-            role: owner.role,
-            isPremium: owner.role === 'premium',
-          } : null,
-        };
-      });
+      return properties.map((property) => ({
+        ...property,
+        createdAt: property.createdAt.toISOString(),
+        updatedAt: property.updatedAt.toISOString(),
+        owner: {
+          ...property.owner,
+          isPremium: property.owner.role === 'premium',
+        },
+      }));
     } catch (error) {
       console.error('Error fetching featured properties:', error);
       throw new TRPCError({

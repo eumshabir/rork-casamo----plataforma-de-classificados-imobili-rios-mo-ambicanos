@@ -26,7 +26,7 @@ const getBaseUrl = () => {
   }
   
   // For production, use the deployed API
-  return 'https://your-production-api.com/api';
+  return process.env.API_URL || 'https://your-production-api.com/api';
 };
 
 // Create the tRPC client

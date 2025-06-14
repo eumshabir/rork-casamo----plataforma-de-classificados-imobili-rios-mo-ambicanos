@@ -1,16 +1,13 @@
 import { z } from "zod";
 import { publicProcedure } from "@/backend/trpc/create-context";
+import { TRPCError } from "@trpc/server";
 
 export const getPropertyByIdProcedure = publicProcedure
-  .input(
-    z.object({
-      id: z.string(),
-    })
-  )
+  .input(z.object({ id: z.string() }))
   .query(async ({ input, ctx }) => {
     try {
       // Get property by ID
-      const property = await ctx.db.property.findUnique({
+      const property = await ctx.prisma.property.findUnique({
         where: {
           id: input.id,
         },
@@ -27,11 +24,14 @@ export const getPropertyByIdProcedure = publicProcedure
       });
       
       if (!property) {
-        throw new Error('Property not found');
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Property not found',
+        });
       }
       
-      // Increment view count
-      await ctx.db.property.update({
+      // Increment the view count
+      await ctx.prisma.property.update({
         where: {
           id: input.id,
         },
@@ -45,6 +45,8 @@ export const getPropertyByIdProcedure = publicProcedure
       // Transform the data to match the expected format
       return {
         ...property,
+        createdAt: property.createdAt.toISOString(),
+        updatedAt: property.updatedAt.toISOString(),
         owner: {
           ...property.owner,
           isPremium: property.owner.role === 'premium',
@@ -52,6 +54,12 @@ export const getPropertyByIdProcedure = publicProcedure
       };
     } catch (error) {
       console.error('Error fetching property:', error);
-      throw new Error('Failed to fetch property');
+      if (error instanceof TRPCError) {
+        throw error;
+      }
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch property',
+      });
     }
   });

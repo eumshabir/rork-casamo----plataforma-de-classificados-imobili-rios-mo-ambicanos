@@ -2,6 +2,10 @@ import { z } from "zod";
 import { publicProcedure } from "@/backend/trpc/create-context";
 import { TRPCError } from "@trpc/server";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+// JWT secret key - should be in environment variables in production
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 export const registerProcedure = publicProcedure
   .input(
@@ -15,7 +19,11 @@ export const registerProcedure = publicProcedure
   .mutation(async ({ input, ctx }) => {
     try {
       // Check if the email is already in use
-      if (ctx.db.users.has(input.email)) {
+      const existingUser = await ctx.prisma.user.findUnique({
+        where: { email: input.email },
+      });
+      
+      if (existingUser) {
         throw new TRPCError({
           code: 'CONFLICT',
           message: 'Email already in use',
@@ -25,26 +33,22 @@ export const registerProcedure = publicProcedure
       // Hash the password
       const passwordHash = await bcrypt.hash(input.password, 10);
       
-      // Create a unique ID
-      const id = `user_${Date.now()}`;
-      
       // Create the user
-      const user = {
-        id,
-        name: input.name,
-        email: input.email,
-        phone: input.phone,
-        passwordHash,
-        role: 'user',
-        verified: false,
-        createdAt: new Date().toISOString(),
-      };
+      const user = await ctx.prisma.user.create({
+        data: {
+          name: input.name,
+          email: input.email,
+          phone: input.phone,
+          passwordHash,
+          role: 'user',
+          verified: false,
+        },
+      });
       
-      // Store the user
-      ctx.db.users.set(input.email, user);
-      
-      // Generate a simple token (in production use proper JWT)
-      const token = id;
+      // Generate a JWT token
+      const token = jwt.sign({ userId: user.id }, JWT_SECRET, {
+        expiresIn: '30d',
+      });
       
       // Return the user and token
       return {
@@ -52,10 +56,10 @@ export const registerProcedure = publicProcedure
           id: user.id,
           name: user.name,
           email: user.email,
-          phone: user.phone,
+          phone: user.phone || '',
           role: user.role,
           verified: user.verified,
-          createdAt: user.createdAt,
+          createdAt: user.createdAt.toISOString(),
         },
         token,
       };

@@ -2,6 +2,10 @@ import { z } from "zod";
 import { publicProcedure } from "@/backend/trpc/create-context";
 import { TRPCError } from "@trpc/server";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+// JWT secret key - should be in environment variables in production
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 export const loginProcedure = publicProcedure
   .input(
@@ -13,7 +17,9 @@ export const loginProcedure = publicProcedure
   .mutation(async ({ input, ctx }) => {
     try {
       // Find the user by email
-      const user = ctx.db.users.get(input.email);
+      const user = await ctx.prisma.user.findUnique({
+        where: { email: input.email },
+      });
       
       if (!user) {
         throw new TRPCError({
@@ -23,7 +29,7 @@ export const loginProcedure = publicProcedure
       }
       
       // Check if the password is correct
-      const isPasswordValid = await bcrypt.compare(input.password, user.passwordHash);
+      const isPasswordValid = await bcrypt.compare(input.password, user.passwordHash || '');
       
       if (!isPasswordValid) {
         throw new TRPCError({
@@ -32,8 +38,10 @@ export const loginProcedure = publicProcedure
         });
       }
       
-      // Generate a simple token (in production use proper JWT)
-      const token = user.id;
+      // Generate a JWT token
+      const token = jwt.sign({ userId: user.id }, JWT_SECRET, {
+        expiresIn: '30d',
+      });
       
       // Return the user and token
       return {
@@ -41,11 +49,11 @@ export const loginProcedure = publicProcedure
           id: user.id,
           name: user.name,
           email: user.email,
-          phone: user.phone,
+          phone: user.phone || '',
           role: user.role,
           verified: user.verified,
-          createdAt: user.createdAt,
-          premiumUntil: user.premiumUntil,
+          createdAt: user.createdAt.toISOString(),
+          premiumUntil: user.premiumUntil ? user.premiumUntil.toISOString() : null,
         },
         token,
       };

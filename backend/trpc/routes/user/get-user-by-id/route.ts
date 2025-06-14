@@ -1,38 +1,51 @@
 import { z } from "zod";
-import { protectedProcedure } from "@/backend/trpc/create-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { publicProcedure } from "@/backend/trpc/create-context";
+import { TRPCError } from "@trpc/server";
 
-export const getUserByIdProcedure = protectedProcedure
-  .input(
-    z.object({
-      userId: z.string(),
-      isAdmin: z.boolean().default(false), // Admin check is optional for this endpoint
-    })
-  )
+export const getUserByIdProcedure = publicProcedure
+  .input(z.object({ id: z.string() }))
   .query(async ({ input, ctx }) => {
     try {
-      // Get users from AsyncStorage
-      const storedUsers = await AsyncStorage.getItem('mock_users');
-      const users = storedUsers ? JSON.parse(storedUsers) : [];
-
-      // Find the user by ID
-      const user = users.find(user => user.id === input.userId);
-
+      // Get user by ID
+      const user = await ctx.prisma.user.findUnique({
+        where: {
+          id: input.id,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          verified: true,
+          createdAt: true,
+          premiumUntil: true,
+        },
+      });
+      
       if (!user) {
-        throw new Error("User not found");
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'User not found',
+        });
       }
-
-      // If not admin, remove sensitive information
-      if (!input.isAdmin) {
-        // Remove any sensitive fields here if needed
-        // For example, we might want to hide some admin-only fields
-        const { /* sensitive fields */ ...safeUser } = user;
-        return safeUser;
-      }
-
-      return user;
+      
+      // Transform the data to match the expected format
+      return {
+        ...user,
+        phone: user.phone || '',
+        createdAt: user.createdAt.toISOString(),
+        premiumUntil: user.premiumUntil ? user.premiumUntil.toISOString() : null,
+        isPremium: user.role === 'premium',
+      };
     } catch (error) {
       console.error('Error fetching user:', error);
-      throw new Error("Failed to fetch user");
+      if (error instanceof TRPCError) {
+        throw error;
+      }
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch user',
+      });
     }
   });
