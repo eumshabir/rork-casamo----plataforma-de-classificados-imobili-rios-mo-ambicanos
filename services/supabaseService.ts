@@ -150,10 +150,10 @@ export const supabaseAuthService = {
   // Google OAuth login
   loginWithGoogle: async (): Promise<{ user: User; token: string }> => {
     try {
-      const { data, error } = await supabaseHelper.auth.signInWithOAuth('google');
+      const result = await supabaseHelper.auth.signInWithOAuth('google');
       
-      if (error) {
-        throw error;
+      if (result.error) {
+        throw result.error;
       }
       
       // Wait for the OAuth flow to complete
@@ -235,10 +235,10 @@ export const supabaseAuthService = {
   // Facebook OAuth login
   loginWithFacebook: async (): Promise<{ user: User; token: string }> => {
     try {
-      const { data, error } = await supabaseHelper.auth.signInWithOAuth('facebook');
+      const result = await supabaseHelper.auth.signInWithOAuth('facebook');
       
-      if (error) {
-        throw error;
+      if (result.error) {
+        throw result.error;
       }
       
       // Wait for the OAuth flow to complete
@@ -694,6 +694,7 @@ export const supabasePropertyService = {
         title: item.title,
         description: item.description,
         price: item.price,
+        currency: item.currency || 'MZN',
         type: item.type,
         listingType: item.listing_type,
         bedrooms: item.bedrooms,
@@ -705,19 +706,21 @@ export const supabasePropertyService = {
         location: {
           province: item.province,
           city: item.city,
+          neighborhood: item.neighborhood,
           district: item.district,
           address: item.address,
           latitude: item.latitude,
           longitude: item.longitude,
         },
-        images: item.images ? item.images.map((img: any) => ({
-          id: img.id,
-          url: img.url,
-          order: img.order,
-        })) : [],
+        images: item.images ? item.images.map((img: any) => img.url) : [],
         amenities: [], // We'll need to fetch these separately or join in the query
         createdAt: item.created_at,
-        userId: item.user_id,
+        owner: {
+          id: item.user_id,
+          name: 'Owner', // We'll need to fetch this separately
+          phone: '', // We'll need to fetch this separately
+          isPremium: false // We'll need to fetch this separately
+        }
       }));
     } catch (error: any) {
       throw new Error(error.message || 'Failed to get properties');
@@ -742,6 +745,7 @@ export const supabasePropertyService = {
         title: item.title,
         description: item.description,
         price: item.price,
+        currency: item.currency || 'MZN',
         type: item.type,
         listingType: item.listing_type,
         bedrooms: item.bedrooms,
@@ -753,19 +757,21 @@ export const supabasePropertyService = {
         location: {
           province: item.province,
           city: item.city,
+          neighborhood: item.neighborhood,
           district: item.district,
           address: item.address,
           latitude: item.latitude,
           longitude: item.longitude,
         },
-        images: item.images ? item.images.map((img: any) => ({
-          id: img.id,
-          url: img.url,
-          order: img.order,
-        })) : [],
+        images: item.images ? item.images.map((img: any) => img.url) : [],
         amenities: [], // We'll need to fetch these separately or join in the query
         createdAt: item.created_at,
-        userId: item.user_id,
+        owner: {
+          id: item.user_id,
+          name: 'Owner', // We'll need to fetch this separately
+          phone: '', // We'll need to fetch this separately
+          isPremium: false // We'll need to fetch this separately
+        }
       }));
     } catch (error: any) {
       throw new Error(error.message || 'Failed to get featured properties');
@@ -796,6 +802,7 @@ export const supabasePropertyService = {
         title: item.title,
         description: item.description,
         price: item.price,
+        currency: item.currency || 'MZN',
         type: item.type,
         listingType: item.listing_type,
         bedrooms: item.bedrooms,
@@ -807,19 +814,21 @@ export const supabasePropertyService = {
         location: {
           province: item.province,
           city: item.city,
+          neighborhood: item.neighborhood,
           district: item.district,
           address: item.address,
           latitude: item.latitude,
           longitude: item.longitude,
         },
-        images: item.images ? item.images.map((img: any) => ({
-          id: img.id,
-          url: img.url,
-          order: img.order,
-        })) : [],
+        images: item.images ? item.images.map((img: any) => img.url) : [],
         amenities: [], // We'll need to fetch these separately or join in the query
         createdAt: item.created_at,
-        userId: item.user_id,
+        owner: {
+          id: user.id,
+          name: user.user_metadata?.name || '',
+          phone: user.user_metadata?.phone || '',
+          isPremium: false // We'll need to determine this
+        }
       }));
     } catch (error: any) {
       throw new Error(error.message || 'Failed to get user properties');
@@ -844,12 +853,31 @@ export const supabasePropertyService = {
         data.property_amenities.map((amenity: any) => amenity.name) : 
         [];
       
+      // Get owner info
+      const { data: ownerData, error: ownerError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', data.user_id)
+        .single();
+        
+      if (ownerError && ownerError.code !== 'PGRST116') {
+        throw ownerError;
+      }
+      
+      const owner = ownerData || {
+        id: data.user_id,
+        name: 'Owner',
+        phone: '',
+        role: 'user'
+      };
+      
       // Transform data to match our Property type
       return {
         id: data.id,
         title: data.title,
         description: data.description,
         price: data.price,
+        currency: data.currency || 'MZN',
         type: data.type,
         listingType: data.listing_type,
         bedrooms: data.bedrooms,
@@ -861,19 +889,21 @@ export const supabasePropertyService = {
         location: {
           province: data.province,
           city: data.city,
+          neighborhood: data.neighborhood,
           district: data.district,
           address: data.address,
           latitude: data.latitude,
           longitude: data.longitude,
         },
-        images: data.images ? data.images.map((img: any) => ({
-          id: img.id,
-          url: img.url,
-          order: img.order,
-        })) : [],
+        images: data.images ? data.images.map((img: any) => img.url) : [],
         amenities,
         createdAt: data.created_at,
-        userId: data.user_id,
+        owner: {
+          id: owner.id,
+          name: owner.name,
+          phone: owner.phone || '',
+          isPremium: owner.role === 'premium'
+        }
       };
     } catch (error: any) {
       throw new Error(error.message || 'Property not found');
@@ -930,12 +960,13 @@ export const supabasePropertyService = {
       }
       
       // Prepare property data for Supabase
-      const { location, images, amenities, ...rest } = propertyData;
+      const { location, images, amenities, owner, ...rest } = propertyData;
       
       const dbPropertyData = {
         ...rest,
         province: location.province,
         city: location.city,
+        neighborhood: location.neighborhood,
         district: location.district,
         address: location.address,
         latitude: location.latitude,
@@ -944,6 +975,7 @@ export const supabasePropertyService = {
         created_at: new Date().toISOString(),
         views: 0,
         listing_type: propertyData.listingType,
+        currency: propertyData.currency || 'MZN'
       };
       
       // Create property
@@ -977,8 +1009,8 @@ export const supabasePropertyService = {
       if (images && images.length > 0) {
         // In a real app, you would upload the images to storage first
         // For now, we'll just use the URLs directly
-        const imageData = images.map((image, index) => ({
-          url: image.url,
+        const imageData = images.map((imageUrl, index) => ({
+          url: imageUrl,
           order: index,
           property_id: newProperty.id,
           created_at: new Date().toISOString(),
@@ -1031,6 +1063,7 @@ export const supabasePropertyService = {
       if (updates.title !== undefined) dbUpdates.title = updates.title;
       if (updates.description !== undefined) dbUpdates.description = updates.description;
       if (updates.price !== undefined) dbUpdates.price = updates.price;
+      if (updates.currency !== undefined) dbUpdates.currency = updates.currency;
       if (updates.type !== undefined) dbUpdates.type = updates.type;
       if (updates.listingType !== undefined) dbUpdates.listing_type = updates.listingType;
       if (updates.bedrooms !== undefined) dbUpdates.bedrooms = updates.bedrooms;
@@ -1043,6 +1076,7 @@ export const supabasePropertyService = {
       if (updates.location) {
         if (updates.location.province !== undefined) dbUpdates.province = updates.location.province;
         if (updates.location.city !== undefined) dbUpdates.city = updates.location.city;
+        if (updates.location.neighborhood !== undefined) dbUpdates.neighborhood = updates.location.neighborhood;
         if (updates.location.district !== undefined) dbUpdates.district = updates.location.district;
         if (updates.location.address !== undefined) dbUpdates.address = updates.location.address;
         if (updates.location.latitude !== undefined) dbUpdates.latitude = updates.location.latitude;
@@ -1102,8 +1136,8 @@ export const supabasePropertyService = {
         
         // Add new images
         if (updates.images.length > 0) {
-          const imageData = updates.images.map((image, index) => ({
-            url: image.url,
+          const imageData = updates.images.map((imageUrl, index) => ({
+            url: imageUrl,
             order: index,
             property_id: id,
             created_at: new Date().toISOString(),
@@ -1297,6 +1331,7 @@ export const supabasePropertyService = {
         title: item.title,
         description: item.description,
         price: item.price,
+        currency: item.currency || 'MZN',
         type: item.type,
         listingType: item.listing_type,
         bedrooms: item.bedrooms,
@@ -1308,19 +1343,21 @@ export const supabasePropertyService = {
         location: {
           province: item.province,
           city: item.city,
+          neighborhood: item.neighborhood,
           district: item.district,
           address: item.address,
           latitude: item.latitude,
           longitude: item.longitude,
         },
-        images: item.images ? item.images.map((img: any) => ({
-          id: img.id,
-          url: img.url,
-          order: img.order,
-        })) : [],
+        images: item.images ? item.images.map((img: any) => img.url) : [],
         amenities: [], // We'll need to fetch these separately or join in the query
         createdAt: item.created_at,
-        userId: item.user_id,
+        owner: {
+          id: item.user_id,
+          name: 'Owner', // We'll need to fetch this separately
+          phone: '', // We'll need to fetch this separately
+          isPremium: false // We'll need to fetch this separately
+        }
       }));
     } catch (error: any) {
       throw new Error(error.message || 'Search failed');
@@ -1408,6 +1445,7 @@ export const supabasePropertyService = {
           title: item.title,
           description: item.description,
           price: item.price,
+          currency: item.currency || 'MZN',
           type: item.type,
           listingType: item.listing_type,
           bedrooms: item.bedrooms,
@@ -1419,6 +1457,7 @@ export const supabasePropertyService = {
           location: {
             province: item.province,
             city: item.city,
+            neighborhood: item.neighborhood,
             district: item.district,
             address: item.address,
             latitude: item.latitude,
@@ -1427,7 +1466,12 @@ export const supabasePropertyService = {
           images: [], // We'll need to fetch these separately or join in the query
           amenities: [], // We'll need to fetch these separately or join in the query
           createdAt: item.created_at,
-          userId: item.user_id,
+          owner: {
+            id: item.user_id,
+            name: 'Owner', // We'll need to fetch this separately
+            phone: '', // We'll need to fetch this separately
+            isPremium: false // We'll need to fetch this separately
+          }
         };
       });
     } catch (error: any) {

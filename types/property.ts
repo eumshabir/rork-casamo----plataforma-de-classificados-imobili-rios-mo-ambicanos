@@ -6,10 +6,14 @@ export interface Location {
   province: string;
   city: string;
   neighborhood?: string;
+  district?: string;
+  address?: string;
   coordinates?: {
     latitude: number;
     longitude: number;
   };
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface Owner {
@@ -35,8 +39,10 @@ export interface Property {
   images: string[];
   owner: Owner;
   featured: boolean;
+  boostedUntil?: string;
   createdAt: string;
   views: number;
+  userId?: string;
 }
 
 export interface PropertyFilter {
