@@ -1,23 +1,37 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { type CreateNextContextOptions } from '@trpc/server/adapters/next';
-import { getAuth } from '@clerk/nextjs/server';
-import { PrismaClient } from '@prisma/client';
 
-// Initialize Prisma client
-const prisma = new PrismaClient();
+// We'll use a simple in-memory database for now
+// Later we can integrate with Prisma when it's properly set up
+const db = {
+  users: new Map(),
+  properties: new Map(),
+  // Add more collections as needed
+};
 
 export const createContext = async (opts: CreateNextContextOptions) => {
   const { req } = opts;
   
-  // Get the session from the request
-  const auth = getAuth(req);
-  const userId = auth.userId;
+  // For now, we'll use a simple auth check
+  // Later we can integrate with Clerk or another auth provider
+  const authHeader = req.headers.authorization;
+  let userId = null;
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    // Simple token validation - in production use proper JWT validation
+    try {
+      // This is a placeholder - in real app, decode and verify the JWT
+      userId = token; // In real app, this would be decoded from JWT
+    } catch (error) {
+      console.error('Auth error:', error);
+    }
+  }
   
   return {
     userId,
-    db: prisma,
-    auth,
+    db,
   };
 };
 
@@ -53,9 +67,7 @@ const isAdmin = t.middleware(async ({ next, ctx }) => {
   }
   
   // Get the user from the database
-  const user = await ctx.db.user.findUnique({
-    where: { id: ctx.userId },
-  });
+  const user = ctx.db.users.get(ctx.userId);
   
   if (!user || user.role !== 'admin') {
     throw new TRPCError({

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { publicProcedure } from "@/backend/trpc/create-context";
-import { PropertyFilter } from "@/types/property";
+import { TRPCError } from "@trpc/server";
 
 export const getPropertiesProcedure = publicProcedure
   .input(
@@ -18,91 +18,85 @@ export const getPropertiesProcedure = publicProcedure
   )
   .query(async ({ input, ctx }) => {
     try {
-      // Build the query based on the filters
-      const where: any = {};
+      // Get all properties from the in-memory database
+      let properties = Array.from(ctx.db.properties.values());
       
-      if (input?.type) {
-        where.type = input.type;
+      // Apply filters if provided
+      if (input) {
+        if (input.type) {
+          properties = properties.filter((property: any) => property.type === input.type);
+        }
+        
+        if (input.listingType) {
+          properties = properties.filter((property: any) => property.listingType === input.listingType);
+        }
+        
+        if (input.province) {
+          properties = properties.filter((property: any) => 
+            property.location && property.location.province === input.province
+          );
+        }
+        
+        if (input.city) {
+          properties = properties.filter((property: any) => 
+            property.location && property.location.city === input.city
+          );
+        }
+        
+        if (input.minPrice) {
+          properties = properties.filter((property: any) => property.price >= input.minPrice);
+        }
+        
+        if (input.maxPrice) {
+          properties = properties.filter((property: any) => property.price <= input.maxPrice);
+        }
+        
+        if (input.minBedrooms) {
+          properties = properties.filter((property: any) => 
+            property.bedrooms && property.bedrooms >= input.minBedrooms
+          );
+        }
+        
+        if (input.minBathrooms) {
+          properties = properties.filter((property: any) => 
+            property.bathrooms && property.bathrooms >= input.minBathrooms
+          );
+        }
+        
+        if (input.amenities && input.amenities.length > 0) {
+          properties = properties.filter((property: any) => 
+            property.amenities && input.amenities?.every(amenity => 
+              property.amenities.includes(amenity)
+            )
+          );
+        }
       }
       
-      if (input?.listingType) {
-        where.listingType = input.listingType;
-      }
-      
-      if (input?.province) {
-        where.location = {
-          ...where.location,
-          province: input.province,
-        };
-      }
-      
-      if (input?.city) {
-        where.location = {
-          ...where.location,
-          city: input.city,
-        };
-      }
-      
-      if (input?.minPrice) {
-        where.price = {
-          ...where.price,
-          gte: input.minPrice,
-        };
-      }
-      
-      if (input?.maxPrice) {
-        where.price = {
-          ...where.price,
-          lte: input.maxPrice,
-        };
-      }
-      
-      if (input?.minBedrooms) {
-        where.bedrooms = {
-          gte: input.minBedrooms,
-        };
-      }
-      
-      if (input?.minBathrooms) {
-        where.bathrooms = {
-          gte: input.minBathrooms,
-        };
-      }
-      
-      if (input?.amenities && input.amenities.length > 0) {
-        where.amenities = {
-          hasEvery: input.amenities,
-        };
-      }
-      
-      // Get properties from the database
-      const properties = await ctx.db.property.findMany({
-        where,
-        include: {
-          owner: {
-            select: {
-              id: true,
-              name: true,
-              phone: true,
-              role: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      });
+      // Sort by creation date (newest first)
+      properties.sort((a: any, b: any) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
       
       // Transform the data to match the expected format
-      return properties.map(property => ({
-        ...property,
-        owner: {
-          ...property.owner,
-          isPremium: property.owner.role === 'premium',
-        },
-      }));
+      return properties.map((property: any) => {
+        const owner = ctx.db.users.get(property.ownerId);
+        
+        return {
+          ...property,
+          owner: owner ? {
+            id: owner.id,
+            name: owner.name,
+            phone: owner.phone,
+            role: owner.role,
+            isPremium: owner.role === 'premium',
+          } : null,
+        };
+      });
     } catch (error) {
       console.error('Error fetching properties:', error);
-      throw new Error('Failed to fetch properties');
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch properties',
+      });
     }
   });

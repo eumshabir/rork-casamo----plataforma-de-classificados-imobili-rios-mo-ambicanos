@@ -11,19 +11,3 @@ export interface User {
   premiumUntil?: string;
   createdAt: string;
 }
-
-export interface UserStats {
-  totalListings: number;
-  activeListings: number;
-  totalViews: number;
-  totalContacts: number;
-}
-
-export interface PremiumPlan {
-  id: string;
-  name: string;
-  price: number;
-  currency: string;
-  duration: number; // in days
-  features: string[];
-}

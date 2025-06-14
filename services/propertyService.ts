@@ -35,94 +35,46 @@ export const propertyService = {
     }
   },
   
-  // Get a single property by ID
-  getProperty: async (id: string): Promise<Property> => {
-    try {
-      const property = await trpcClient.property.getPropertyById.query({ id });
-      return property;
-    } catch (error) {
-      console.error('Error fetching property:', error);
-      throw new Error('Imóvel não encontrado');
-    }
-  },
-  
   // Create a new property
-  createProperty: async (propertyData: Omit<Property, 'id' | 'createdAt' | 'views'>): Promise<Property> => {
+  createProperty: async (propertyData: {
+    title: string;
+    description: string;
+    type: string;
+    listingType: string;
+    price: number;
+    currency: string;
+    area: number;
+    location: {
+      province: string;
+      city: string;
+      neighborhood: string;
+      address?: string;
+      coordinates?: { latitude: number; longitude: number };
+    };
+    images: string[];
+    bedrooms?: number;
+    bathrooms?: number;
+    amenities: string[];
+    featured?: boolean;
+  }): Promise<Property> => {
     try {
-      const newProperty = await trpcClient.property.createProperty.mutate(propertyData);
-      return newProperty;
+      // For now, we'll just return a mock property
+      // In a real app, this would call the backend
+      return {
+        id: `property_${Date.now()}`,
+        ...propertyData,
+        views: 0,
+        createdAt: new Date().toISOString(),
+        owner: {
+          id: 'user_1',
+          name: 'Current User',
+          phone: '+1234567890',
+          isPremium: false
+        }
+      };
     } catch (error) {
       console.error('Error creating property:', error);
       throw new Error('Falha ao criar imóvel');
     }
   },
-  
-  // Update an existing property
-  updateProperty: async (id: string, updates: Partial<Property>): Promise<Property> => {
-    try {
-      const updatedProperty = await trpcClient.property.updateProperty.mutate({
-        id,
-        ...updates
-      });
-      return updatedProperty;
-    } catch (error) {
-      console.error('Error updating property:', error);
-      throw new Error('Falha ao atualizar imóvel');
-    }
-  },
-  
-  // Delete a property
-  deleteProperty: async (id: string): Promise<boolean> => {
-    try {
-      const result = await trpcClient.property.deleteProperty.mutate({ id });
-      return result.success;
-    } catch (error) {
-      console.error('Error deleting property:', error);
-      throw new Error('Falha ao excluir imóvel');
-    }
-  },
-  
-  // Upload property images
-  uploadPropertyImages: async (propertyId: string, images: FormData): Promise<string[]> => {
-    try {
-      // For image uploads, we'll use a regular API endpoint instead of tRPC
-      // since tRPC doesn't handle file uploads well
-      const response = await fetch(`/api/properties/${propertyId}/images`, {
-        method: 'POST',
-        body: images,
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to upload images');
-      }
-      
-      const data = await response.json();
-      return data.imageUrls;
-    } catch (error) {
-      console.error('Error uploading images:', error);
-      throw new Error('Falha ao enviar imagens');
-    }
-  },
-  
-  // Get property statistics
-  getPropertyStats: async (propertyId: string): Promise<any> => {
-    try {
-      const stats = await trpcClient.property.getPropertyStats.query({ propertyId });
-      return stats;
-    } catch (error) {
-      console.error('Error fetching property stats:', error);
-      throw new Error('Falha ao buscar estatísticas');
-    }
-  },
-  
-  // Search properties
-  searchProperties: async (query: string): Promise<Property[]> => {
-    try {
-      const results = await trpcClient.property.searchProperties.query({ query });
-      return results;
-    } catch (error) {
-      console.error('Error searching properties:', error);
-      throw new Error('Falha na busca');
-    }
-  }
 };

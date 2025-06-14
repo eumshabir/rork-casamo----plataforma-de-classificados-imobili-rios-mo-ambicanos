@@ -2,7 +2,6 @@ import { z } from "zod";
 import { publicProcedure } from "@/backend/trpc/create-context";
 import { TRPCError } from "@trpc/server";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 
 export const registerProcedure = publicProcedure
   .input(
@@ -16,13 +15,7 @@ export const registerProcedure = publicProcedure
   .mutation(async ({ input, ctx }) => {
     try {
       // Check if the email is already in use
-      const existingUser = await ctx.db.user.findUnique({
-        where: {
-          email: input.email,
-        },
-      });
-      
-      if (existingUser) {
+      if (ctx.db.users.has(input.email)) {
         throw new TRPCError({
           code: 'CONFLICT',
           message: 'Email already in use',
@@ -32,25 +25,26 @@ export const registerProcedure = publicProcedure
       // Hash the password
       const passwordHash = await bcrypt.hash(input.password, 10);
       
-      // Create the user
-      const user = await ctx.db.user.create({
-        data: {
-          name: input.name,
-          email: input.email,
-          phone: input.phone,
-          passwordHash,
-          role: 'user',
-          verified: false,
-          createdAt: new Date(),
-        },
-      });
+      // Create a unique ID
+      const id = `user_${Date.now()}`;
       
-      // Generate a JWT token
-      const token = jwt.sign(
-        { userId: user.id },
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: '7d' }
-      );
+      // Create the user
+      const user = {
+        id,
+        name: input.name,
+        email: input.email,
+        phone: input.phone,
+        passwordHash,
+        role: 'user',
+        verified: false,
+        createdAt: new Date().toISOString(),
+      };
+      
+      // Store the user
+      ctx.db.users.set(input.email, user);
+      
+      // Generate a simple token (in production use proper JWT)
+      const token = id;
       
       // Return the user and token
       return {
@@ -61,7 +55,7 @@ export const registerProcedure = publicProcedure
           phone: user.phone,
           role: user.role,
           verified: user.verified,
-          createdAt: user.createdAt.toISOString(),
+          createdAt: user.createdAt,
         },
         token,
       };

@@ -2,7 +2,6 @@ import { z } from "zod";
 import { publicProcedure } from "@/backend/trpc/create-context";
 import { TRPCError } from "@trpc/server";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 
 export const loginProcedure = publicProcedure
   .input(
@@ -14,11 +13,7 @@ export const loginProcedure = publicProcedure
   .mutation(async ({ input, ctx }) => {
     try {
       // Find the user by email
-      const user = await ctx.db.user.findUnique({
-        where: {
-          email: input.email,
-        },
-      });
+      const user = ctx.db.users.get(input.email);
       
       if (!user) {
         throw new TRPCError({
@@ -37,12 +32,8 @@ export const loginProcedure = publicProcedure
         });
       }
       
-      // Generate a JWT token
-      const token = jwt.sign(
-        { userId: user.id },
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: '7d' }
-      );
+      // Generate a simple token (in production use proper JWT)
+      const token = user.id;
       
       // Return the user and token
       return {
@@ -53,8 +44,8 @@ export const loginProcedure = publicProcedure
           phone: user.phone,
           role: user.role,
           verified: user.verified,
-          createdAt: user.createdAt.toISOString(),
-          premiumUntil: user.premiumUntil ? user.premiumUntil.toISOString() : undefined,
+          createdAt: user.createdAt,
+          premiumUntil: user.premiumUntil,
         },
         token,
       };
