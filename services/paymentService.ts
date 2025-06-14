@@ -1,8 +1,5 @@
-import { authService } from './authService';
 import { handleApiError, shouldUseTRPC, shouldUseSupabase } from './api';
 import { trpcClient } from '@/lib/trpc';
-import { supabaseAuthService } from './supabaseService';
-import { supabasePropertyService } from './supabaseService';
 
 // Payment methods
 export const PAYMENT_METHODS = [
@@ -24,7 +21,7 @@ export const PAYMENT_METHODS = [
 ];
 
 // Payment accounts
-export const PAYMENT_ACCOUNTS = {
+export const PAYMENT_ACCOUNTS: Record<string, any> = {
   mpesa: {
     number: '841234567',
     name: 'CasaMoç, Lda',
@@ -121,18 +118,7 @@ export const paymentService = {
   // Process payment for premium subscription
   processPremiumPayment: async (planId: string, paymentMethod: string, phoneNumber: string): Promise<any> => {
     try {
-      // Try to use Supabase first
-      if (await shouldUseSupabase()) {
-        // Find the plan
-        const plan = PREMIUM_PLANS.find(p => p.id === planId);
-        if (!plan) {
-          throw new Error('Plano não encontrado');
-        }
-        
-        return await supabaseAuthService.upgradeToPremium(planId, paymentMethod, phoneNumber);
-      }
-      
-      // Try to use tRPC if Supabase is not available
+      // Try to use tRPC if available
       if (await shouldUseTRPC()) {
         return await trpcClient.payment.upgradeToPremium.mutate({
           planId,
@@ -141,7 +127,7 @@ export const paymentService = {
         });
       }
       
-      // If neither is available, use mock
+      // If not available, use mock
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Find the plan
@@ -153,9 +139,6 @@ export const paymentService = {
       // Calculate premium expiration date
       const premiumUntil = new Date();
       premiumUntil.setDate(premiumUntil.getDate() + plan.duration);
-      
-      // Update user to premium
-      await authService.upgradeToPremium(plan.duration);
       
       return {
         success: true,
@@ -170,12 +153,7 @@ export const paymentService = {
   // Process payment for property boost
   processBoostPayment: async (propertyId: string, boostOptionId: string, paymentMethod: string, phoneNumber: string): Promise<any> => {
     try {
-      // Try to use Supabase first
-      if (await shouldUseSupabase()) {
-        return await supabasePropertyService.boostProperty(propertyId, boostOptionId, paymentMethod, phoneNumber);
-      }
-      
-      // Try to use tRPC if Supabase is not available
+      // Try to use tRPC if available
       if (await shouldUseTRPC()) {
         return await trpcClient.payment.boostProperty.mutate({
           propertyId,
@@ -185,7 +163,7 @@ export const paymentService = {
         });
       }
       
-      // If neither is available, use mock
+      // If not available, use mock
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Find the boost option
@@ -211,17 +189,12 @@ export const paymentService = {
   // Get payment history
   getPaymentHistory: async (): Promise<any[]> => {
     try {
-      // Try to use Supabase first
-      if (await shouldUseSupabase()) {
-        // Implementation would go here
-      }
-      
-      // Try to use tRPC if Supabase is not available
+      // Try to use tRPC if available
       if (await shouldUseTRPC()) {
         return await trpcClient.payment.getPaymentHistory.query();
       }
       
-      // If neither is available, use mock
+      // If not available, use mock
       await new Promise(resolve => setTimeout(resolve, 500));
       
       // Mock payment history

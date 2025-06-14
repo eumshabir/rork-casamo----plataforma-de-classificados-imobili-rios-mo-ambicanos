@@ -1,7 +1,61 @@
-import { supabase, supabaseHelper } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { User, UserRole } from '@/types/user';
 import { Property, PropertyFilter } from '@/types/property';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Helper function to safely access Supabase auth
+const supabaseHelper = {
+  auth: {
+    signInWithPassword: async (email: string, password: string) => {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) throw error;
+      return { session: data.session, user: data.user };
+    },
+    
+    signUp: async (email: string, password: string, metadata?: any) => {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: metadata,
+        },
+      });
+      
+      if (error) throw error;
+      return { session: data.session, user: data.user };
+    },
+    
+    signInWithOAuth: async (provider: 'google' | 'facebook') => {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    
+    signOut: async () => {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    },
+    
+    getSession: async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      return data.session;
+    },
+    
+    getCurrentUser: async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) throw error;
+      return data.user;
+    },
+  },
+};
 
 // Auth service with Supabase
 export const supabaseAuthService = {

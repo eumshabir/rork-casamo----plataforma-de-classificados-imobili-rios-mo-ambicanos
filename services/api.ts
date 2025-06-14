@@ -1,24 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
-import axios from 'axios';
-
-// API client for making HTTP requests
-export const apiClient = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000',
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add auth token to requests
-apiClient.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('auth_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
 
 // Check if Supabase is available and configured
 export const shouldUseSupabase = async (): Promise<boolean> => {

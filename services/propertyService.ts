@@ -152,7 +152,20 @@ export const propertyService = {
       
       // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
-        return await trpcClient.property.createProperty.mutate(propertyData);
+        // Extract location data for tRPC
+        const { location, ...rest } = propertyData;
+        const tRPCPropertyData = {
+          ...rest,
+          province: location.province,
+          city: location.city,
+          neighborhood: location.neighborhood,
+          district: location.district,
+          address: location.address,
+          latitude: location.latitude,
+          longitude: location.longitude,
+        };
+        
+        return await trpcClient.property.createProperty.mutate(tRPCPropertyData);
       }
       
       // If neither is available, use mock
@@ -191,7 +204,27 @@ export const propertyService = {
       
       // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
-        return await trpcClient.property.updateProperty.mutate({ id, data: updates });
+        // Extract location data for tRPC if it exists
+        let tRPCUpdates: any = { ...updates };
+        
+        if (updates.location) {
+          const { location, ...rest } = updates;
+          tRPCUpdates = {
+            ...rest,
+            ...(location.province && { province: location.province }),
+            ...(location.city && { city: location.city }),
+            ...(location.neighborhood && { neighborhood: location.neighborhood }),
+            ...(location.district && { district: location.district }),
+            ...(location.address && { address: location.address }),
+            ...(location.latitude && { latitude: location.latitude }),
+            ...(location.longitude && { longitude: location.longitude }),
+          };
+        }
+        
+        return await trpcClient.property.updateProperty.mutate({ 
+          id, 
+          data: tRPCUpdates 
+        });
       }
       
       // If neither is available, use mock

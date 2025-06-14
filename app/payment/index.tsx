@@ -18,7 +18,7 @@ import Input from '@/components/Input';
 import Button from '@/components/Button';
 import Colors from '@/constants/colors';
 import { paymentService, PAYMENT_METHODS, PAYMENT_ACCOUNTS } from '@/services/paymentService';
-import * as Clipboard from 'expo-clipboard/build/Clipboard';
+import * as Clipboard from 'expo-clipboard';
 
 export default function PaymentScreen() {
   const router = useRouter();
@@ -152,7 +152,7 @@ export default function PaymentScreen() {
   const getAccountInfo = (method: string, property: 'number' | 'name'): string => {
     const accountInfo = PAYMENT_ACCOUNTS[method as keyof typeof PAYMENT_ACCOUNTS];
     if (accountInfo && typeof accountInfo === 'object' && property in accountInfo) {
-      return (accountInfo as any)[property];
+      return accountInfo[property];
     }
     return '';
   };
