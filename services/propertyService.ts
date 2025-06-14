@@ -1,6 +1,32 @@
 import { Property } from '@/types/property';
 import { trpcClient } from '@/lib/trpc';
 
+// Define the property input type to match what the backend expects
+type PropertyInput = {
+  title: string;
+  description: string;
+  price: number;
+  currency: string;
+  type: string;
+  listingType: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  area: number;
+  location: {
+    province: string;
+    city: string;
+    neighborhood: string;
+    address?: string;
+    coordinates?: {
+      latitude: number;
+      longitude: number;
+    };
+  };
+  amenities: string[];
+  images: string[];
+  featured?: boolean;
+};
+
 export const propertyService = {
   // Get all properties with optional filters
   getProperties: async (filters?: {
@@ -55,7 +81,8 @@ export const propertyService = {
   // Create a new property
   createProperty: async (propertyData: Omit<Property, 'id' | 'createdAt' | 'views' | 'owner'>): Promise<Property> => {
     try {
-      return await trpcClient.property.createProperty.mutate({
+      // Ensure all required fields are present
+      const input: PropertyInput = {
         title: propertyData.title,
         description: propertyData.description,
         price: propertyData.price,
@@ -66,16 +93,18 @@ export const propertyService = {
         bathrooms: propertyData.bathrooms,
         area: propertyData.area,
         location: {
-          province: propertyData.location.province,
-          city: propertyData.location.city,
-          neighborhood: propertyData.location.neighborhood,
+          province: propertyData.location.province || '',
+          city: propertyData.location.city || '',
+          neighborhood: propertyData.location.neighborhood || '',
           address: propertyData.location.address,
           coordinates: propertyData.location.coordinates,
         },
-        amenities: propertyData.amenities,
-        images: propertyData.images,
+        amenities: propertyData.amenities || [],
+        images: propertyData.images || [],
         featured: propertyData.featured,
-      });
+      };
+      
+      return await trpcClient.property.createProperty.mutate(input);
     } catch (error) {
       console.error('Error creating property:', error);
       throw new Error('Failed to create property');

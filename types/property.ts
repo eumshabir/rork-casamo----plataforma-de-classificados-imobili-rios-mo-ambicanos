@@ -1,4 +1,4 @@
-export interface PropertyLocation {
+export type PropertyLocation = {
   province: string;
   city: string;
   neighborhood: string;
@@ -7,43 +7,31 @@ export interface PropertyLocation {
     latitude: number;
     longitude: number;
   };
-}
+};
 
-export interface PropertyOwner {
+export type PropertyOwner = {
   id: string;
   name: string;
-  phone: string;
+  phone?: string;
   isPremium: boolean;
-}
+};
 
-export interface Property {
+export type Property = {
   id: string;
   title: string;
   description: string;
+  price: number;
+  currency: string;
   type: string; // apartment, house, land, commercial
   listingType: string; // sale, rent
-  price: number;
-  currency: string; // MZN, USD
-  area: number; // in square meters
-  location: PropertyLocation;
-  images: string[];
   bedrooms?: number;
   bathrooms?: number;
-  amenities: string[];
-  featured?: boolean;
+  area: number; // in square meters
+  location: PropertyLocation;
+  amenities: string[]; // pool, garage, garden, etc.
+  images: string[]; // URLs to images
   views: number;
+  featured?: boolean;
   createdAt: string;
   owner: PropertyOwner;
-}
-
-export interface PropertyFilter {
-  type?: string;
-  listingType?: string;
-  province?: string;
-  city?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  minBedrooms?: number;
-  minBathrooms?: number;
-  amenities?: string[];
-}
+};

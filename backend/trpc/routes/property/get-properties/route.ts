@@ -96,7 +96,7 @@ export const getPropertiesProcedure = publicProcedure
       });
       
       // Transform the data to match the expected format
-      return properties.map((property) => ({
+      return properties.map((property: any) => ({
         ...property,
         createdAt: property.createdAt.toISOString(),
         updatedAt: property.updatedAt.toISOString(),

@@ -1,13 +1,13 @@
 export type UserRole = 'user' | 'premium' | 'admin';
 
-export interface User {
+export type User = {
   id: string;
   name: string;
   email: string;
-  phone: string;
+  phone?: string;
   role: UserRole;
   avatar?: string;
   verified: boolean;
-  premiumUntil?: string;
+  premiumUntil?: string | null;
   createdAt: string;
-}
+};
