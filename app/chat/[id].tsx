@@ -17,6 +17,14 @@ import { useChatStore } from '@/store/chatStore';
 import { useAuthStore } from '@/store/authStore';
 import Colors from '@/constants/colors';
 
+// Define message type
+interface Message {
+  id: string;
+  content: string;
+  senderId: string;
+  createdAt: string;
+}
+
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -189,7 +197,7 @@ export default function ChatScreen() {
               <Text style={styles.dateText}>{item.date}</Text>
             </View>
             
-            {item.messages.map((message) => {
+            {item.messages.map((message: Message) => {
               const isCurrentUser = message.senderId === user?.id;
               
               return (

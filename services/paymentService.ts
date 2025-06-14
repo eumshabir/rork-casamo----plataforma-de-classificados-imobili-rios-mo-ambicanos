@@ -43,7 +43,7 @@ export const paymentService = {
       // Try to use the real API first
       const response = await apiClient.post('/payments/process', paymentRequest);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       // Check if it's a validation error for phone number
       if (error.response?.status === 422 && error.response?.data?.errors?.phoneNumber) {
         return {
