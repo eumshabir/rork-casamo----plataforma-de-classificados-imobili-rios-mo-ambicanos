@@ -499,11 +499,6 @@ export const supabaseAuthService = {
             .single();
             
           if (createError) throw createError;
-          
-          // Use created settings
-          const plan = createdSettings;
-        } else {
-          throw settingsError;
         }
       }
       
