@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, UserRole } from '@/types/user';
-import { apiClient, handleApiError, shouldUseTRPC, shouldUseSupabase } from './api';
+import { handleApiError, shouldUseTRPC, shouldUseSupabase } from './api';
 import { trpcClient } from '@/lib/trpc';
 import { supabaseAuthService } from './supabaseService';
 

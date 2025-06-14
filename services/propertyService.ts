@@ -162,7 +162,8 @@ export const propertyService = {
         ...propertyData,
         id: Date.now().toString(),
         createdAt: new Date().toISOString(),
-        views: 0
+        views: 0,
+        currency: propertyData.currency || 'MZN'
       };
       
       // In a real app, we would save this to a database

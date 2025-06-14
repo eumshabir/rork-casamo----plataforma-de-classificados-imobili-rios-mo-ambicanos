@@ -73,9 +73,11 @@ export default function PaymentScreen() {
   };
   
   const handleCopyNumber = async () => {
-    const accountNumber = PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS].number;
-    await Clipboard.setStringAsync(accountNumber);
-    Alert.alert('Copiado', 'Número copiado para a área de transferência');
+    const accountInfo = PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS];
+    if (typeof accountInfo === 'object' && 'number' in accountInfo) {
+      await Clipboard.setStringAsync(accountInfo.number);
+      Alert.alert('Copiado', 'Número copiado para a área de transferência');
+    }
   };
   
   const handleCopyReference = async () => {
@@ -218,7 +220,9 @@ export default function PaymentScreen() {
                 <Text style={styles.accountLabel}>Número:</Text>
                 <View style={styles.accountValueContainer}>
                   <Text style={styles.accountValue}>
-                    {PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS].number}
+                    {typeof PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS] === 'object' && 
+                     'number' in PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS] ? 
+                     (PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS] as {number: string}).number : ''}
                   </Text>
                   <TouchableOpacity onPress={handleCopyNumber}>
                     <Copy size={20} color={Colors.primary} />
@@ -228,7 +232,9 @@ export default function PaymentScreen() {
               <View style={styles.accountInfo}>
                 <Text style={styles.accountLabel}>Nome:</Text>
                 <Text style={styles.accountValue}>
-                  {PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS].name}
+                  {typeof PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS] === 'object' && 
+                   'name' in PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS] ? 
+                   (PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS] as {name: string}).name : ''}
                 </Text>
               </View>
               <View style={styles.accountInfo}>

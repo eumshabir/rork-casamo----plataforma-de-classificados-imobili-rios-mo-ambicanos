@@ -2,6 +2,7 @@ import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
 import { hash, compare } from "bcryptjs";
+// @ts-ignore
 import { sign } from "jsonwebtoken";
 
 export const authRouter = router({
