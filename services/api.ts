@@ -1,8 +1,9 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { trpcClient } from '@/lib/trpc';
 
 // Base URL for the API
-const API_URL = 'https://api.casamoc.com/v1';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.casamoc.com/v1';
 
 // Create axios instance
 export const apiClient = axios.create({
@@ -131,4 +132,16 @@ export const handleApiError = (error: any): string => {
   
   // Something happened in setting up the request that triggered an Error
   return error.message || 'Ocorreu um erro. Tente novamente.';
+};
+
+// Function to check if we should use tRPC or fallback to mock data
+export const shouldUseTRPC = async (): Promise<boolean> => {
+  try {
+    // Try to make a simple tRPC request to check if the backend is available
+    await trpcClient.auth.me.query();
+    return true;
+  } catch (error) {
+    // If the request fails, use mock data
+    return false;
+  }
 };

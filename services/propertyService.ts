@@ -1,16 +1,18 @@
-import { apiClient, handleApiError } from './api';
 import { Property, PropertyFilter } from '@/types/property';
+import { handleApiError, shouldUseTRPC } from './api';
 import { mockProperties } from '@/mocks/properties';
+import { trpcClient } from '@/lib/trpc';
 
 export const propertyService = {
   // Get all properties with optional filters
   getProperties: async (filter?: PropertyFilter): Promise<Property[]> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.get('/properties', { params: filter });
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.property.getProperties.query(filter);
+      }
+      
+      // If tRPC is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 800));
       
       // Apply filters if any
@@ -55,48 +57,57 @@ export const propertyService = {
       }
       
       return filteredProperties;
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Get featured properties
   getFeaturedProperties: async (): Promise<Property[]> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.get('/properties/featured');
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.property.getFeaturedProperties.query();
+      }
+      
+      // If tRPC is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 500));
       
       const featured = mockProperties.filter(p => p.featured);
       return featured;
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Get user's properties
   getUserProperties: async (): Promise<Property[]> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.get('/properties/user');
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.property.getUserProperties.query();
+      }
+      
+      // If tRPC is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 500));
       
       // For demo, we'll just use the first two properties
       const userProps = mockProperties.slice(0, 2);
       return userProps;
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Get a single property by ID
   getProperty: async (id: string): Promise<Property> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.get(`/properties/${id}`);
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.property.getProperty.query({ id });
+      }
+      
+      // If tRPC is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 300));
       
       const property = mockProperties.find(p => p.id === id);
@@ -105,17 +116,20 @@ export const propertyService = {
       }
       
       return property;
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Create a new property
   createProperty: async (propertyData: Omit<Property, 'id' | 'createdAt' | 'views'>): Promise<Property> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.post('/properties', propertyData);
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.property.createProperty.mutate(propertyData);
+      }
+      
+      // If tRPC is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       const newProperty: Property = {
@@ -129,17 +143,20 @@ export const propertyService = {
       mockProperties.unshift(newProperty);
       
       return newProperty;
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Update an existing property
   updateProperty: async (id: string, updates: Partial<Property>): Promise<Property> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.put(`/properties/${id}`, updates);
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.property.updateProperty.mutate({ id, data: updates });
+      }
+      
+      // If tRPC is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 800));
       
       const propertyIndex = mockProperties.findIndex(p => p.id === id);
@@ -155,17 +172,21 @@ export const propertyService = {
       mockProperties[propertyIndex] = updatedProperty;
       
       return updatedProperty;
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Delete a property
   deleteProperty: async (id: string): Promise<boolean> => {
     try {
-      // Try to use the real API first
-      await apiClient.delete(`/properties/${id}`);
-      return true;
-    } catch (error) {
-      // If API is not available, use mock
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        const result = await trpcClient.property.deleteProperty.mutate({ id });
+        return result.success;
+      }
+      
+      // If tRPC is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 600));
       
       const propertyIndex = mockProperties.findIndex(p => p.id === id);
@@ -176,38 +197,36 @@ export const propertyService = {
       mockProperties.splice(propertyIndex, 1);
       
       return true;
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Upload property images
   uploadPropertyImages: async (propertyId: string, images: FormData): Promise<string[]> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.post(`/properties/${propertyId}/images`, images, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      return response.data.imageUrls;
-    } catch (error) {
-      // If API is not available, use mock
+      // In a real app, you would upload images to a storage service like AWS S3
+      // For now, we'll just return mock image URLs
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       // Mock image URLs
       return Array(images.getAll('images').length)
         .fill(0)
         .map((_, i) => `https://images.unsplash.com/photo-${Date.now()}-${i}?w=800`);
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Get property statistics
   getPropertyStats: async (propertyId: string): Promise<any> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.get(`/properties/${propertyId}/stats`);
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.property.getPropertyStats.query({ id: propertyId });
+      }
+      
+      // If tRPC is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 700));
       
       // Mock statistics
@@ -217,17 +236,20 @@ export const propertyService = {
         favorites: Math.floor(Math.random() * 30) + 5,
         lastViewedAt: new Date().toISOString(),
       };
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Search properties
   searchProperties: async (query: string): Promise<Property[]> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.get('/properties/search', { params: { q: query } });
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.property.searchProperties.query({ query });
+      }
+      
+      // If tRPC is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 600));
       
       // Simple search in title and description
@@ -237,6 +259,92 @@ export const propertyService = {
       );
       
       return results;
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
-  }
+  },
+  
+  // Add property to favorites
+  addToFavorites: async (propertyId: string): Promise<boolean> => {
+    try {
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        const result = await trpcClient.property.addToFavorites.mutate({ propertyId });
+        return result.success;
+      }
+      
+      // If tRPC is not available, use mock
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // In a real app, we would save this to a database
+      return true;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+  
+  // Remove property from favorites
+  removeFromFavorites: async (propertyId: string): Promise<boolean> => {
+    try {
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        const result = await trpcClient.property.removeFromFavorites.mutate({ propertyId });
+        return result.success;
+      }
+      
+      // If tRPC is not available, use mock
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // In a real app, we would remove this from a database
+      return true;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+  
+  // Get user's favorite properties
+  getFavorites: async (): Promise<Property[]> => {
+    try {
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.property.getFavorites.query();
+      }
+      
+      // If tRPC is not available, use mock
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // For demo, we'll just use a few random properties
+      const favorites = mockProperties.slice(0, 3);
+      return favorites;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+  
+  // Boost a property
+  boostProperty: async (propertyId: string, boostOptionId: string, paymentMethod: string, phoneNumber: string): Promise<any> => {
+    try {
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.payment.boostProperty.mutate({
+          propertyId,
+          boostOptionId,
+          paymentMethod,
+          phoneNumber,
+        });
+      }
+      
+      // If tRPC is not available, use mock
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Mock boost response
+      return {
+        success: true,
+        message: "Imóvel destacado com sucesso",
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
 };

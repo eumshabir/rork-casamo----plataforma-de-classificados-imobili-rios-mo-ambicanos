@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, UserRole } from '@/types/user';
-import { apiClient } from './api';
+import { apiClient, handleApiError, shouldUseTRPC } from './api';
+import { trpcClient } from '@/lib/trpc';
 
 // Mock API endpoints
 const MOCK_API_DELAY = 800;
@@ -38,16 +39,18 @@ export const authService = {
   // Email & Password Login
   login: async (email: string, password: string): Promise<{ user: User; token: string }> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.post('/auth/login', { email, password });
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        const result = await trpcClient.auth.login.mutate({ email, password });
+        
+        // Store auth data
+        await AsyncStorage.setItem(AUTH_TOKEN_KEY, result.token);
+        await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(result.user));
+        
+        return result;
+      }
       
-      // Store auth data
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.data.token);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data.user));
-      
-      return response.data;
-    } catch (error) {
-      // Fallback to mock if API is not available
+      // Fallback to mock if tRPC is not available
       await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
       
       const user = MOCK_USERS.find(u => u.email === email);
@@ -67,22 +70,31 @@ export const authService = {
         user: userWithoutPassword as User, 
         token 
       };
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Register new user
   register: async (userData: Partial<User>, password: string): Promise<{ user: User; token: string }> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.post('/auth/register', { ...userData, password });
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        const result = await trpcClient.auth.register.mutate({
+          name: userData.name || '',
+          email: userData.email || '',
+          phone: userData.phone,
+          password,
+        });
+        
+        // Store auth data
+        await AsyncStorage.setItem(AUTH_TOKEN_KEY, result.token);
+        await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(result.user));
+        
+        return result;
+      }
       
-      // Store auth data
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.data.token);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data.user));
-      
-      return response.data;
-    } catch (error) {
-      // Fallback to mock if API is not available
+      // Fallback to mock if tRPC is not available
       await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
       
       // Check if email already exists
@@ -116,22 +128,16 @@ export const authService = {
         user: userWithoutPassword as User, 
         token 
       };
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Google OAuth login
   loginWithGoogle: async (): Promise<{ user: User; token: string }> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.post('/auth/google');
-      
-      // Store auth data
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.data.token);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data.user));
-      
-      return response.data;
-    } catch (error) {
-      // Fallback to mock if API is not available
+      // In a real app, you would implement OAuth with Google
+      // For now, we'll just use mock data
       await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
       
       // Mock Google auth response
@@ -152,22 +158,16 @@ export const authService = {
       await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(googleUser));
       
       return { user: googleUser, token };
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Facebook OAuth login
   loginWithFacebook: async (): Promise<{ user: User; token: string }> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.post('/auth/facebook');
-      
-      // Store auth data
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.data.token);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data.user));
-      
-      return response.data;
-    } catch (error) {
-      // Fallback to mock if API is not available
+      // In a real app, you would implement OAuth with Facebook
+      // For now, we'll just use mock data
       await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
       
       // Mock Facebook auth response
@@ -188,25 +188,19 @@ export const authService = {
       await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(facebookUser));
       
       return { user: facebookUser, token };
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Logout
   logout: async (): Promise<void> => {
     try {
-      // Try to use the real API first
-      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-      if (token) {
-        await apiClient.post('/auth/logout', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      }
-    } catch (error) {
-      // Ignore errors from API
-    } finally {
-      // Always remove local storage items
+      // Remove local storage items
       await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
       await AsyncStorage.removeItem(USER_DATA_KEY);
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
@@ -219,20 +213,20 @@ export const authService = {
   // Get current user data
   getCurrentUser: async (): Promise<User | null> => {
     try {
-      // Try to get from API first
-      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-      if (token) {
-        const response = await apiClient.get('/auth/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        const user = await trpcClient.auth.me.query();
         
         // Update stored user data
-        await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data));
-        return response.data;
+        await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(user));
+        return user as User;
       }
-      return null;
-    } catch (error) {
+      
       // Fallback to local storage
+      const userData = await AsyncStorage.getItem(USER_DATA_KEY);
+      return userData ? JSON.parse(userData) : null;
+    } catch (error) {
+      // If tRPC fails, try local storage
       const userData = await AsyncStorage.getItem(USER_DATA_KEY);
       return userData ? JSON.parse(userData) : null;
     }
@@ -241,19 +235,16 @@ export const authService = {
   // Update user profile
   updateProfile: async (updates: Partial<User>): Promise<User> => {
     try {
-      // Try to use the real API first
-      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-      if (!token) throw new Error('User not authenticated');
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        const updatedUser = await trpcClient.user.updateProfile.mutate(updates);
+        
+        // Update stored user data
+        await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(updatedUser));
+        return updatedUser as User;
+      }
       
-      const response = await apiClient.put('/users/profile', updates, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      // Update stored user data
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data));
-      return response.data;
-    } catch (error) {
-      // Fallback to mock if API is not available
+      // Fallback to mock if tRPC is not available
       await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
       
       const userData = await AsyncStorage.getItem(USER_DATA_KEY);
@@ -278,25 +269,28 @@ export const authService = {
       await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(updatedUser));
       
       return updatedUser;
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Upgrade to premium
-  upgradeToPremium: async (planDuration: number): Promise<User> => {
+  upgradeToPremium: async (planId: string, paymentMethod: string, phoneNumber: string): Promise<User> => {
     try {
-      // Try to use the real API first
-      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-      if (!token) throw new Error('User not authenticated');
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        const updatedUser = await trpcClient.payment.upgradeToPremium.mutate({
+          planId,
+          paymentMethod,
+          phoneNumber,
+        });
+        
+        // Update stored user data
+        await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(updatedUser));
+        return updatedUser as User;
+      }
       
-      const response = await apiClient.post('/users/premium', { planDuration }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      // Update stored user data
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data));
-      return response.data;
-    } catch (error) {
-      // Fallback to mock if API is not available
+      // Fallback to mock if tRPC is not available
       await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
       
       const userData = await AsyncStorage.getItem(USER_DATA_KEY);
@@ -308,7 +302,7 @@ export const authService = {
       
       // Calculate premium expiration date
       const premiumUntil = new Date();
-      premiumUntil.setDate(premiumUntil.getDate() + planDuration);
+      premiumUntil.setDate(premiumUntil.getDate() + 30); // Default to 30 days
       
       const updatedUser = { 
         ...currentUser, 
@@ -330,47 +324,59 @@ export const authService = {
       await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(updatedUser));
       
       return updatedUser;
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Verify phone number with SMS code
   verifyPhone: async (phone: string, code: string): Promise<boolean> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.post('/auth/verify-phone', { phone, code });
-      return response.data.success;
-    } catch (error) {
-      // Fallback to mock if API is not available
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        const result = await trpcClient.auth.verifyPhone.mutate({ phone, code });
+        return result.success;
+      }
+      
+      // Fallback to mock if tRPC is not available
       await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
       
       // Mock verification (always succeeds with code "123456")
       return code === "123456";
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Request SMS verification code
   requestVerificationCode: async (phone: string): Promise<boolean> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.post('/auth/request-code', { phone });
-      return response.data.success;
-    } catch (error) {
-      // Fallback to mock if API is not available
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        const result = await trpcClient.auth.requestVerificationCode.mutate({ phone });
+        return result.success;
+      }
+      
+      // Fallback to mock if tRPC is not available
       await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
       
       // Mock request (always succeeds)
       return true;
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Reset password
   resetPassword: async (email: string): Promise<boolean> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.post('/auth/reset-password', { email });
-      return response.data.success;
-    } catch (error) {
-      // Fallback to mock if API is not available
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        const result = await trpcClient.auth.resetPassword.mutate({ email });
+        return result.success;
+      }
+      
+      // Fallback to mock if tRPC is not available
       await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
       
       // Check if email exists
@@ -381,6 +387,51 @@ export const authService = {
       
       // Mock reset (always succeeds if email exists)
       return true;
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
-  }
+  },
+  
+  // Change password
+  changePassword: async (currentPassword: string, newPassword: string): Promise<boolean> => {
+    try {
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        const result = await trpcClient.user.changePassword.mutate({
+          currentPassword,
+          newPassword,
+        });
+        return result.success;
+      }
+      
+      // Fallback to mock if tRPC is not available
+      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
+      
+      // Get current user
+      const userData = await AsyncStorage.getItem(USER_DATA_KEY);
+      if (!userData) {
+        throw new Error('User not authenticated');
+      }
+      
+      const currentUser = JSON.parse(userData);
+      
+      // Find user in mock database
+      const userIndex = MOCK_USERS.findIndex(u => u.id === currentUser.id);
+      if (userIndex === -1) {
+        throw new Error('User not found');
+      }
+      
+      // Check current password
+      if (MOCK_USERS[userIndex].password !== currentPassword) {
+        throw new Error('Current password is incorrect');
+      }
+      
+      // Update password
+      MOCK_USERS[userIndex].password = newPassword;
+      
+      return true;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
 };

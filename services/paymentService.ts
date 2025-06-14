@@ -1,4 +1,5 @@
-import { apiClient, handleApiError } from './api';
+import { handleApiError, shouldUseTRPC } from './api';
+import { trpcClient } from '@/lib/trpc';
 
 export interface PaymentMethod {
   id: string;
@@ -40,20 +41,12 @@ export const paymentService = {
   // Process payment
   processPayment: async (paymentRequest: PaymentRequest): Promise<PaymentResponse> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.post('/payments/process', paymentRequest);
-      return response.data;
-    } catch (error: any) {
-      // Check if it's a validation error for phone number
-      if (error.response?.status === 422 && error.response?.data?.errors?.phoneNumber) {
-        return {
-          success: false,
-          message: 'Número de telefone inválido. Use o formato: +258 8X XXX XXXX',
-          timestamp: new Date().toISOString()
-        };
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.payment.processPayment.mutate(paymentRequest);
       }
       
-      // If API is not available or other error, use mock
+      // If tRPC is not available, use mock
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 2000));
       
@@ -84,17 +77,20 @@ export const paymentService = {
           timestamp: new Date().toISOString()
         };
       }
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Verify payment status
   verifyPayment: async (transactionId: string): Promise<PaymentResponse> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.get(`/payments/verify/${transactionId}`);
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.payment.verifyPayment.query({ transactionId });
+      }
+      
+      // If tRPC is not available, use mock
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1500));
       
@@ -116,17 +112,20 @@ export const paymentService = {
           timestamp: new Date().toISOString()
         };
       }
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Get payment history
   getPaymentHistory: async (): Promise<any[]> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.get('/payments/history');
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.payment.getPaymentHistory.query();
+      }
+      
+      // If tRPC is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Return mock payment history
@@ -150,17 +149,20 @@ export const paymentService = {
           createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()
         }
       ];
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Get premium plans
   getPremiumPlans: async (): Promise<any[]> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.get('/payments/premium-plans');
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.payment.getPremiumPlans.query();
+      }
+      
+      // If tRPC is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 800));
       
       // Return mock premium plans
@@ -208,17 +210,20 @@ export const paymentService = {
           ]
         }
       ];
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
   // Get boost options for properties
   getBoostOptions: async (): Promise<any[]> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.get('/payments/boost-options');
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.payment.getBoostOptions.query();
+      }
+      
+      // If tRPC is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 800));
       
       // Return mock boost options
@@ -262,22 +267,88 @@ export const paymentService = {
           ]
         }
       ];
+    } catch (error) {
+      throw new Error(handleApiError(error));
     }
   },
   
-  // Apply boost to a property
-  boostProperty: async (propertyId: string, boostOptionId: string, paymentRequest: PaymentRequest): Promise<PaymentResponse> => {
+  // Upgrade user to premium
+  upgradeToPremium: async (planId: string, paymentMethod: string, phoneNumber: string): Promise<any> => {
     try {
-      // Try to use the real API first
-      const response = await apiClient.post('/payments/boost-property', {
-        propertyId,
-        boostOptionId,
-        ...paymentRequest
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.payment.upgradeToPremium.mutate({
+          planId,
+          paymentMethod,
+          phoneNumber,
+        });
+      }
+      
+      // If tRPC is not available, use mock
+      // Use the process payment mock
+      const paymentResult = await paymentService.processPayment({
+        amount: 1500, // Default to monthly price
+        currency: 'MZN',
+        method: paymentMethod,
+        phoneNumber,
+        description: 'Assinatura Premium',
       });
-      return response.data;
+      
+      if (paymentResult.success) {
+        // Return mock user with premium status
+        return {
+          id: '1',
+          name: 'João Silva',
+          email: 'joao@example.com',
+          phone: '+258 84 123 4567',
+          role: 'premium',
+          verified: true,
+          premiumUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: '2023-01-15T10:30:00Z',
+        };
+      } else {
+        throw new Error(paymentResult.message);
+      }
     } catch (error) {
-      // If API is not available, use the process payment mock
-      return paymentService.processPayment(paymentRequest);
+      throw new Error(handleApiError(error));
     }
-  }
+  },
+  
+  // Boost a property
+  boostProperty: async (propertyId: string, boostOptionId: string, paymentMethod: string, phoneNumber: string): Promise<any> => {
+    try {
+      // Try to use tRPC first
+      if (await shouldUseTRPC()) {
+        return await trpcClient.payment.boostProperty.mutate({
+          propertyId,
+          boostOptionId,
+          paymentMethod,
+          phoneNumber,
+        });
+      }
+      
+      // If tRPC is not available, use mock
+      // Use the process payment mock
+      const paymentResult = await paymentService.processPayment({
+        amount: 500, // Default to 7-day boost price
+        currency: 'MZN',
+        method: paymentMethod,
+        phoneNumber,
+        description: 'Destaque de anúncio',
+        reference: propertyId,
+      });
+      
+      if (paymentResult.success) {
+        return {
+          success: true,
+          message: 'Imóvel destacado com sucesso',
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        };
+      } else {
+        throw new Error(paymentResult.message);
+      }
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
 };
