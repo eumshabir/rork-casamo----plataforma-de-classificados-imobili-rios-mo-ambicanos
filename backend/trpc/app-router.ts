@@ -1,18 +1,10 @@
-import { router } from "./trpc";
-import { authRouter } from "./routes/auth/router";
-import { propertyRouter } from "./routes/property/router";
-import { chatRouter } from "./routes/chat/router";
-import { notificationRouter } from "./routes/notification/router";
-import { paymentRouter } from "./routes/payment/router";
-import { userRouter } from "./routes/user/router";
+import { createTRPCRouter } from "./create-context";
+import hiRoute from "./routes/example/hi/route";
 
-export const appRouter = router({
-  auth: authRouter,
-  property: propertyRouter,
-  chat: chatRouter,
-  notification: notificationRouter,
-  payment: paymentRouter,
-  user: userRouter,
+export const appRouter = createTRPCRouter({
+  example: createTRPCRouter({
+    hi: hiRoute,
+  }),
 });
 
 export type AppRouter = typeof appRouter;
