@@ -8,12 +8,12 @@ export interface Location {
   neighborhood?: string;
   district?: string;
   address?: string;
+  latitude?: number;
+  longitude?: number;
   coordinates?: {
     latitude: number;
     longitude: number;
   };
-  latitude?: number;
-  longitude?: number;
 }
 
 export interface Owner {

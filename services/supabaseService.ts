@@ -150,15 +150,13 @@ export const supabaseAuthService = {
   // Google OAuth login
   loginWithGoogle: async (): Promise<{ user: User; token: string }> => {
     try {
-      const result = await supabaseHelper.auth.signInWithOAuth('google');
+      const response = await supabaseHelper.auth.signInWithOAuth('google');
       
-      if (result.error) {
-        throw result.error;
-      }
-      
-      // Wait for the OAuth flow to complete
+      // Handle the OAuth flow
       // In a real app, you would handle the redirect and get the session
-      // For now, we'll just get the current session
+      // For now, we'll just get the current session after a delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !sessionData.session) {
@@ -235,15 +233,13 @@ export const supabaseAuthService = {
   // Facebook OAuth login
   loginWithFacebook: async (): Promise<{ user: User; token: string }> => {
     try {
-      const result = await supabaseHelper.auth.signInWithOAuth('facebook');
+      const response = await supabaseHelper.auth.signInWithOAuth('facebook');
       
-      if (result.error) {
-        throw result.error;
-      }
-      
-      // Wait for the OAuth flow to complete
+      // Handle the OAuth flow
       // In a real app, you would handle the redirect and get the session
-      // For now, we'll just get the current session
+      // For now, we'll just get the current session after a delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !sessionData.session) {
@@ -511,7 +507,12 @@ export const supabaseAuthService = {
         }
       }
       
-      const plan = settings;
+      const plan = settings || {
+        premium_monthly_price: 1500,
+        premium_quarterly_price: 4000,
+        premium_yearly_price: 15000,
+        currency: 'MZN'
+      };
       
       // Calculate premium expiration date based on plan
       const premiumUntil = new Date();
@@ -720,7 +721,8 @@ export const supabasePropertyService = {
           name: 'Owner', // We'll need to fetch this separately
           phone: '', // We'll need to fetch this separately
           isPremium: false // We'll need to fetch this separately
-        }
+        },
+        userId: item.user_id
       }));
     } catch (error: any) {
       throw new Error(error.message || 'Failed to get properties');
@@ -771,7 +773,8 @@ export const supabasePropertyService = {
           name: 'Owner', // We'll need to fetch this separately
           phone: '', // We'll need to fetch this separately
           isPremium: false // We'll need to fetch this separately
-        }
+        },
+        userId: item.user_id
       }));
     } catch (error: any) {
       throw new Error(error.message || 'Failed to get featured properties');
@@ -828,7 +831,8 @@ export const supabasePropertyService = {
           name: user.user_metadata?.name || '',
           phone: user.user_metadata?.phone || '',
           isPremium: false // We'll need to determine this
-        }
+        },
+        userId: user.id
       }));
     } catch (error: any) {
       throw new Error(error.message || 'Failed to get user properties');
@@ -903,7 +907,8 @@ export const supabasePropertyService = {
           name: owner.name,
           phone: owner.phone || '',
           isPremium: owner.role === 'premium'
-        }
+        },
+        userId: data.user_id
       };
     } catch (error: any) {
       throw new Error(error.message || 'Property not found');
@@ -966,11 +971,11 @@ export const supabasePropertyService = {
         ...rest,
         province: location.province,
         city: location.city,
-        neighborhood: location.neighborhood,
-        district: location.district,
-        address: location.address,
-        latitude: location.latitude,
-        longitude: location.longitude,
+        neighborhood: location.neighborhood || null,
+        district: location.district || null,
+        address: location.address || null,
+        latitude: location.latitude || null,
+        longitude: location.longitude || null,
         user_id: user.id,
         created_at: new Date().toISOString(),
         views: 0,
@@ -1357,7 +1362,8 @@ export const supabasePropertyService = {
           name: 'Owner', // We'll need to fetch this separately
           phone: '', // We'll need to fetch this separately
           isPremium: false // We'll need to fetch this separately
-        }
+        },
+        userId: item.user_id
       }));
     } catch (error: any) {
       throw new Error(error.message || 'Search failed');
@@ -1471,7 +1477,8 @@ export const supabasePropertyService = {
             name: 'Owner', // We'll need to fetch this separately
             phone: '', // We'll need to fetch this separately
             isPremium: false // We'll need to fetch this separately
-          }
+          },
+          userId: item.user_id
         };
       });
     } catch (error: any) {

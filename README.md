@@ -1,105 +1,98 @@
 # CasaMoc - Real Estate App
 
-CasaMoc is a real estate application for Mozambique, allowing users to list, search, and manage properties.
+## Supabase Setup
 
-## Features
+To set up the Supabase database for this project, follow these steps:
 
-- User authentication (email/password, Google, Facebook)
-- Property listings with images and details
-- Search and filter properties
-- Premium user subscriptions
-- Property boosting
-- Favorites and messaging
-- M-Pesa and e-Mola payment integration
+1. Log in to your Supabase account and go to your project dashboard.
 
-## Setup Instructions
+2. Go to the SQL Editor and run the SQL script from `sql/supabase-setup.sql` to create all the necessary tables, functions, and policies.
 
-### Prerequisites
-
-- Node.js (v16+)
-- Expo CLI
-- Supabase account
-
-### Environment Setup
-
-1. Clone the repository
-2. Copy `.env.example` to `.env` and update with your credentials:
+3. Make sure your Supabase URL and anon key are correctly set in the `.env` file:
 
 ```
-# Supabase credentials
-EXPO_PUBLIC_SUPABASE_URL="your-supabase-url"
-EXPO_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
-
-# M-Pesa API credentials (for production)
-MPESA_API_KEY="your-mpesa-api-key"
-MPESA_API_SECRET="your-mpesa-api-secret"
-MPESA_SERVICE_PROVIDER_CODE="your-service-provider-code"
-
-# e-Mola API credentials (for production)
-EMOLA_API_KEY="your-emola-api-key"
-EMOLA_API_SECRET="your-emola-api-secret"
-EMOLA_MERCHANT_ID="your-merchant-id"
+EXPO_PUBLIC_SUPABASE_URL="https://yrlocxrtmrjkcrolamoj.supabase.co"
+EXPO_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlybG9jeHJ0bXJqa2Nyb2xhbW9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk5MjEwNzEsImV4cCI6MjA2NTQ5NzA3MX0.1mpSZAvNb5MtGwHFZEg31kYsfkRZaRYmdg1bAeqTsrI"
 ```
 
-### Supabase Setup
+4. Configure authentication providers in Supabase:
+   - Go to Authentication > Providers
+   - Enable Email/Password authentication
+   - Configure Google and Facebook OAuth if needed
 
-1. Create a new Supabase project
-2. Go to SQL Editor in your Supabase dashboard
-3. Run the SQL script from `sql/supabase-setup.sql` to create all necessary tables and policies
-4. Create a storage bucket named `property-images` for property images
+5. Set up storage buckets:
+   - Go to Storage > Buckets
+   - Create a new bucket named "property-images"
+   - Set the appropriate permissions
 
-### Installation
+## Development
 
+1. Install dependencies:
 ```bash
-# Install dependencies
 npm install
-
-# Start the development server
-npm start
+# or
+yarn install
 ```
 
-### Building for Production
-
+2. Start the development server:
 ```bash
-# Build for Android
-eas build -p android
+npm start
+# or
+yarn start
+```
 
-# Build for iOS
-eas build -p ios
+3. Run on iOS or Android:
+```bash
+npm run ios
+# or
+npm run android
 ```
 
 ## Project Structure
 
-- `/app` - Expo Router screens
+- `/app` - Expo Router screens and layouts
 - `/components` - Reusable UI components
-- `/constants` - App constants
+- `/constants` - App constants and configuration
 - `/hooks` - Custom React hooks
-- `/lib` - Utility libraries
-- `/mocks` - Mock data (used as fallback)
-- `/services` - API services
+- `/lib` - Utility libraries (Supabase, tRPC)
+- `/mocks` - Mock data for development
+- `/services` - API services and data fetching
 - `/store` - State management with Zustand
+- `/styles` - Shared styles
 - `/types` - TypeScript type definitions
+- `/backend` - Backend API with tRPC and Hono
+- `/sql` - SQL scripts for database setup
 
-## Authentication
+## Environment Variables
 
-The app supports multiple authentication methods:
+Create a `.env` file in the root directory with the following variables:
 
-- Email and password
-- Google OAuth
-- Facebook OAuth
-- Phone number verification
+```
+# Database URL for Prisma
+DATABASE_URL="postgresql://username:password@localhost:5432/casamoc?schema=public"
 
-## Data Storage
+# JWT Secret for authentication
+JWT_SECRET="your-secret-key-here"
 
-All data is stored in Supabase with proper row-level security policies. The app falls back to mock data if Supabase is not available.
+# API Base URL
+EXPO_PUBLIC_API_BASE_URL="http://localhost:3000"
+EXPO_PUBLIC_RORK_API_BASE_URL="http://localhost:3000"
 
-## Payment Integration
+# Supabase credentials
+EXPO_PUBLIC_SUPABASE_URL="https://yrlocxrtmrjkcrolamoj.supabase.co"
+EXPO_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlybG9jeHJ0bXJqa2Nyb2xhbW9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk5MjEwNzEsImV4cCI6MjA2NTQ5NzA3MX0.1mpSZAvNb5MtGwHFZEg31kYsfkRZaRYmdg1bAeqTsrI"
 
-The app integrates with:
+# Payment API credentials (for production)
+MPESA_API_KEY="your-mpesa-api-key"
+MPESA_API_SECRET="your-mpesa-api-secret"
+MPESA_SERVICE_PROVIDER_CODE="your-service-provider-code"
+EMOLA_API_KEY="your-emola-api-key"
+EMOLA_API_SECRET="your-emola-api-secret"
+EMOLA_MERCHANT_ID="your-merchant-id"
 
-- M-Pesa for mobile payments
-- e-Mola as an alternative payment method
-
-## License
-
-This project is proprietary and confidential.
+# File storage (for production)
+S3_ACCESS_KEY="your-s3-access-key"
+S3_SECRET_KEY="your-s3-secret-key"
+S3_BUCKET_NAME="your-bucket-name"
+S3_REGION="your-region"
+```
