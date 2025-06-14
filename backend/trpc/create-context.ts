@@ -1,73 +1,20 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { type CreateNextContextOptions } from '@trpc/server/adapters/next';
+import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 
-// Define a simple user type for now
-type User = {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  role: string;
-  verified: boolean;
-  passwordHash?: string;
-  createdAt: Date;
-  premiumUntil?: Date | null;
+// Initialize Prisma Client
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
 };
 
-// Mock database client
-// In a real app, you would use PrismaClient
-const mockPrisma = {
-  user: {
-    findUnique: async ({ where }: { where: { id: string } | { email: string } }) => {
-      // Mock implementation
-      return null as User | null;
-    },
-    create: async ({ data }: { data: any }) => {
-      // Mock implementation
-      return {
-        id: 'mock-id',
-        ...data,
-        createdAt: new Date(),
-      } as User;
-    }
-  },
-  property: {
-    findMany: async ({ where, orderBy, include, take }: any) => {
-      // Mock implementation
-      return [];
-    },
-    findUnique: async ({ where, include }: any) => {
-      // Mock implementation
-      return null;
-    },
-    create: async ({ data }: any) => {
-      // Mock implementation
-      return {
-        id: 'mock-id',
-        ...data,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-    },
-    update: async ({ where, data }: any) => {
-      // Mock implementation
-      return {
-        id: where.id,
-        ...data,
-        updatedAt: new Date(),
-      };
-    },
-    delete: async ({ where }: any) => {
-      // Mock implementation
-      return { id: where.id };
-    }
-  }
-};
+const prisma = globalForPrisma.prisma ?? new PrismaClient();
 
-// JWT secret key - should be in environment variables in production
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+// JWT secret key - should be in environment variables
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 export const createContext = async (opts: CreateNextContextOptions) => {
   const { req } = opts;
@@ -85,7 +32,7 @@ export const createContext = async (opts: CreateNextContextOptions) => {
       userId = decoded.userId;
       
       // Check if the user exists in the database
-      const user = await mockPrisma.user.findUnique({
+      const user = await prisma.user.findUnique({
         where: { id: userId },
       });
       
@@ -100,7 +47,7 @@ export const createContext = async (opts: CreateNextContextOptions) => {
   
   return {
     userId,
-    prisma: mockPrisma,
+    prisma,
   };
 };
 
@@ -134,6 +81,7 @@ const isAuthed = t.middleware(async ({ next, ctx }) => {
     ctx: {
       userId: ctx.userId,
       user,
+      prisma: ctx.prisma,
     },
   });
 });
@@ -165,6 +113,7 @@ const isAdmin = t.middleware(async ({ next, ctx }) => {
     ctx: {
       userId: ctx.userId,
       user,
+      prisma: ctx.prisma,
     },
   });
 });

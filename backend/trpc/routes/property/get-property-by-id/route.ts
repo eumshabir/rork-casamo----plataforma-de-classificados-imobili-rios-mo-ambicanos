@@ -1,65 +1,48 @@
-import { z } from "zod";
-import { publicProcedure } from "@/backend/trpc/create-context";
-import { TRPCError } from "@trpc/server";
+import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
+import { publicProcedure } from '@/backend/trpc/create-context';
 
 export const getPropertyByIdProcedure = publicProcedure
-  .input(z.object({ id: z.string() }))
+  .input(z.object({
+    id: z.string(),
+  }))
   .query(async ({ input, ctx }) => {
-    try {
-      // Get property by ID
-      const property = await ctx.prisma.property.findUnique({
-        where: {
-          id: input.id,
-        },
-        include: {
-          owner: {
-            select: {
-              id: true,
-              name: true,
-              phone: true,
-              role: true,
-            },
-          },
-        },
-      });
-      
-      if (!property) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Property not found',
-        });
-      }
-      
-      // Increment the view count
-      await ctx.prisma.property.update({
-        where: {
-          id: input.id,
-        },
-        data: {
-          views: {
-            increment: 1,
-          },
-        },
-      });
-      
-      // Transform the data to match the expected format
-      return {
-        ...property,
-        createdAt: property.createdAt.toISOString(),
-        updatedAt: property.updatedAt.toISOString(),
+    const property = await ctx.prisma.property.findUnique({
+      where: {
+        id: input.id,
+      },
+      include: {
         owner: {
-          ...property.owner,
-          isPremium: property.owner.role === 'premium',
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            premiumUntil: true,
+          },
         },
-      };
-    } catch (error) {
-      console.error('Error fetching property:', error);
-      if (error instanceof TRPCError) {
-        throw error;
-      }
+      },
+    });
+    
+    if (!property) {
       throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to fetch property',
+        code: 'NOT_FOUND',
+        message: 'Property not found',
       });
     }
+    
+    // Increment view count
+    await ctx.prisma.property.update({
+      where: { id: input.id },
+      data: { views: { increment: 1 } },
+    });
+    
+    // Transform the data to match the expected format
+    return {
+      ...property,
+      views: property.views + 1,
+      owner: {
+        ...property.owner,
+        isPremium: property.owner.premiumUntil ? new Date(property.owner.premiumUntil) > new Date() : false,
+      },
+    };
   });

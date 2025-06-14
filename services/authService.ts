@@ -26,12 +26,7 @@ export const authService = {
   // Register new user
   register: async (userData: { name: string; email: string; phone: string; password: string }): Promise<{ user: User; token: string }> => {
     try {
-      const response = await trpcClient.auth.register.mutate({ 
-        name: userData.name,
-        email: userData.email,
-        phone: userData.phone,
-        password: userData.password
-      });
+      const response = await trpcClient.auth.register.mutate(userData);
       
       // Store auth data
       await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.token);
@@ -64,7 +59,6 @@ export const authService = {
   // Get current user data
   getCurrentUser: async (): Promise<User | null> => {
     try {
-      // For now, just return the stored user data
       const userData = await AsyncStorage.getItem(USER_DATA_KEY);
       return userData ? JSON.parse(userData) : null;
     } catch (error) {
@@ -76,7 +70,6 @@ export const authService = {
   // Update user profile
   updateProfile: async (updates: Partial<User>): Promise<User> => {
     try {
-      // For now, just update the stored user data
       const userData = await AsyncStorage.getItem(USER_DATA_KEY);
       if (!userData) {
         throw new Error('User not found');

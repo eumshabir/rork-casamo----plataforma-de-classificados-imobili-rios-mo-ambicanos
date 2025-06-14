@@ -1,70 +1,53 @@
-import { z } from "zod";
-import { publicProcedure } from "@/backend/trpc/create-context";
-import { TRPCError } from "@trpc/server";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import { z } from 'zod';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { TRPCError } from '@trpc/server';
+import { publicProcedure } from '@/backend/trpc/create-context';
 
-// JWT secret key - should be in environment variables in production
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 export const loginProcedure = publicProcedure
-  .input(
-    z.object({
-      email: z.string().email(),
-      password: z.string(),
-    })
-  )
+  .input(z.object({
+    email: z.string().email(),
+    password: z.string().min(6),
+  }))
   .mutation(async ({ input, ctx }) => {
-    try {
-      // Find the user by email
-      const user = await ctx.prisma.user.findUnique({
-        where: { email: input.email },
-      });
-      
-      if (!user) {
-        throw new TRPCError({
-          code: 'UNAUTHORIZED',
-          message: 'Invalid credentials',
-        });
-      }
-      
-      // Check if the password is correct
-      const isPasswordValid = await bcrypt.compare(input.password, user.passwordHash || '');
-      
-      if (!isPasswordValid) {
-        throw new TRPCError({
-          code: 'UNAUTHORIZED',
-          message: 'Invalid credentials',
-        });
-      }
-      
-      // Generate a JWT token
-      const token = jwt.sign({ userId: user.id }, JWT_SECRET, {
-        expiresIn: '30d',
-      });
-      
-      // Return the user and token
-      return {
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone || '',
-          role: user.role,
-          verified: user.verified,
-          createdAt: user.createdAt.toISOString(),
-          premiumUntil: user.premiumUntil ? user.premiumUntil.toISOString() : null,
-        },
-        token,
-      };
-    } catch (error) {
-      console.error('Login error:', error);
-      if (error instanceof TRPCError) {
-        throw error;
-      }
+    const { email, password } = input;
+    
+    // Find user by email
+    const user = await ctx.prisma.user.findUnique({
+      where: { email },
+    });
+    
+    if (!user || !user.passwordHash) {
       throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'An error occurred during login',
+        code: 'UNAUTHORIZED',
+        message: 'Invalid email or password',
       });
     }
+    
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+    
+    if (!isValidPassword) {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'Invalid email or password',
+      });
+    }
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user.id },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    // Return user data without password hash
+    const { passwordHash, ...userWithoutPassword } = user;
+    
+    return {
+      user: userWithoutPassword,
+      token,
+    };
   });
