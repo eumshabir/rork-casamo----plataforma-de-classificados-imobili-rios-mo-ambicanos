@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Property, PropertyFilter, PropertyType, ListingType, Amenity } from '@/types/property';
-import { mockProperties } from '@/mocks/properties';
+import { propertyService } from '@/services/propertyService';
 
 interface PropertyState {
   properties: Property[];
@@ -31,52 +31,8 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
   fetchProperties: async () => {
     set({ isLoading: true });
     try {
-      // In a real app, this would be an API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Apply filters if any
-      const filter = get().filter;
-      let filteredProperties = [...mockProperties];
-      
-      if (filter.type) {
-        filteredProperties = filteredProperties.filter(p => p.type === filter.type);
-      }
-      
-      if (filter.listingType) {
-        filteredProperties = filteredProperties.filter(p => p.listingType === filter.listingType);
-      }
-      
-      if (filter.province) {
-        filteredProperties = filteredProperties.filter(p => p.location.province === filter.province);
-      }
-      
-      if (filter.city) {
-        filteredProperties = filteredProperties.filter(p => p.location.city === filter.city);
-      }
-      
-      if (filter.minPrice) {
-        filteredProperties = filteredProperties.filter(p => p.price >= (filter.minPrice || 0));
-      }
-      
-      if (filter.maxPrice) {
-        filteredProperties = filteredProperties.filter(p => p.price <= (filter.maxPrice || Infinity));
-      }
-      
-      if (filter.minBedrooms) {
-        filteredProperties = filteredProperties.filter(p => (p.bedrooms || 0) >= (filter.minBedrooms || 0));
-      }
-      
-      if (filter.minBathrooms) {
-        filteredProperties = filteredProperties.filter(p => (p.bathrooms || 0) >= (filter.minBathrooms || 0));
-      }
-      
-      if (filter.amenities && filter.amenities.length > 0) {
-        filteredProperties = filteredProperties.filter(p => 
-          filter.amenities?.every(amenity => p.amenities.includes(amenity))
-        );
-      }
-      
-      set({ properties: filteredProperties, isLoading: false });
+      const properties = await propertyService.getProperties(get().filter);
+      set({ properties, isLoading: false });
     } catch (error) {
       set({ isLoading: false });
       console.error('Error fetching properties:', error);
@@ -86,10 +42,7 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
   fetchFeaturedProperties: async () => {
     set({ isLoading: true });
     try {
-      // In a real app, this would be an API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const featured = mockProperties.filter(p => p.featured);
+      const featured = await propertyService.getFeaturedProperties();
       set({ featuredProperties: featured, isLoading: false });
     } catch (error) {
       set({ isLoading: false });
@@ -100,11 +53,7 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
   fetchUserProperties: async () => {
     set({ isLoading: true });
     try {
-      // In a real app, this would fetch the current user's properties
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // For demo, we'll just use the first two properties
-      const userProps = mockProperties.slice(0, 2);
+      const userProps = await propertyService.getUserProperties();
       set({ userProperties: userProps, isLoading: false });
     } catch (error) {
       set({ isLoading: false });
@@ -115,15 +64,7 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
   addProperty: async (property) => {
     set({ isLoading: true });
     try {
-      // In a real app, this would be an API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const newProperty: Property = {
-        ...property,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString(),
-        views: 0
-      };
+      const newProperty = await propertyService.createProperty(property);
       
       set(state => ({
         properties: [newProperty, ...state.properties],
@@ -133,38 +74,38 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
     } catch (error) {
       set({ isLoading: false });
       console.error('Error adding property:', error);
+      throw error;
     }
   },
   
   updateProperty: async (id, updates) => {
     set({ isLoading: true });
     try {
-      // In a real app, this would be an API call
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const updatedProperty = await propertyService.updateProperty(id, updates);
       
       set(state => ({
         properties: state.properties.map(p => 
-          p.id === id ? { ...p, ...updates } : p
+          p.id === id ? updatedProperty : p
         ),
         userProperties: state.userProperties.map(p => 
-          p.id === id ? { ...p, ...updates } : p
+          p.id === id ? updatedProperty : p
         ),
         featuredProperties: state.featuredProperties.map(p => 
-          p.id === id ? { ...p, ...updates } : p
+          p.id === id ? updatedProperty : p
         ),
         isLoading: false
       }));
     } catch (error) {
       set({ isLoading: false });
       console.error('Error updating property:', error);
+      throw error;
     }
   },
   
   deleteProperty: async (id) => {
     set({ isLoading: true });
     try {
-      // In a real app, this would be an API call
-      await new Promise(resolve => setTimeout(resolve, 600));
+      await propertyService.deleteProperty(id);
       
       set(state => ({
         properties: state.properties.filter(p => p.id !== id),
@@ -175,6 +116,7 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
     } catch (error) {
       set({ isLoading: false });
       console.error('Error deleting property:', error);
+      throw error;
     }
   },
   

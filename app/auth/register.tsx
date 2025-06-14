@@ -46,6 +46,12 @@ export default function RegisterScreen() {
     
     if (!phone.trim()) {
       newErrors.phone = 'Telefone é obrigatório';
+    } else {
+      // Validate Mozambique phone number format
+      const phoneRegex = /^\+258\s?8[234]\d{7}$/;
+      if (!phoneRegex.test(phone)) {
+        newErrors.phone = 'Formato inválido. Use: +258 8X XXX XXXX';
+      }
     }
     
     if (!password) {
