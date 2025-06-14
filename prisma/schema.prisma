@@ -10,138 +10,78 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User model
 model User {
   id           String    @id @default(cuid())
   name         String
-  email        String?   @unique
-  phone        String?   @unique
-  password     String?
-  role         String    @default("user") // "user", "premium", "admin"
+  email        String    @unique
+  phone        String?
+  passwordHash String?
+  role         String    @default("user") // user, premium, admin
   verified     Boolean   @default(false)
   premiumUntil DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   // Relations
-  properties       Property[]
-  favorites        Favorite[]
-  sentMessages     Message[]        @relation("SentMessages")
-  receivedMessages Message[]        @relation("ReceivedMessages")
-  notifications    Notification[]
-  payments         Payment[]
-  devices          Device[]
-  conversations    Conversation[]   @relation("UserConversations")
+  properties   Property[]
+  conversations Conversation[]
+  messages     Message[]
+  notifications Notification[]
+  payments     Payment[]
+  favorites    Favorite[]
+  devices      Device[]
 }
 
-// Property model
 model Property {
   id          String   @id @default(cuid())
   title       String
   description String
   price       Float
-  type        String // "apartment", "house", "land", etc.
-  listingType String // "sale", "rent"
+  currency    String   @default("MZN")
+  type        String   // apartment, house, land, commercial
+  listingType String   // sale, rent
   bedrooms    Int?
   bathrooms   Int?
-  area        Float?
+  area        Float
+  location    Json     // { province, city, neighborhood, address, coordinates }
+  amenities   String[] // pool, garage, garden, security, etc.
+  images      String[] // URLs to images
   featured    Boolean  @default(false)
-  boostedUntil DateTime?
   views       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  // Location
-  province    String
-  city        String
-  district    String?
-  address     String?
-  latitude    Float?
-  longitude   Float?
+  ownerId     String
 
   // Relations
-  userId      String
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  images      PropertyImage[]
-  amenities   PropertyAmenity[]
+  owner       User      @relation(fields: [ownerId], references: [id])
   favorites   Favorite[]
-
-  @@index([userId])
-  @@index([type])
-  @@index([listingType])
-  @@index([province, city])
-  @@index([featured])
 }
 
-// Property Image model
-model PropertyImage {
-  id         String   @id @default(cuid())
-  url        String
-  order      Int      @default(0)
-  propertyId String
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-
-  @@index([propertyId])
-}
-
-// Property Amenity model
-model PropertyAmenity {
-  id         String   @id @default(cuid())
-  name       String
-  propertyId String
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-
-  @@index([propertyId])
-}
-
-// Favorite model
-model Favorite {
-  id         String   @id @default(cuid())
-  userId     String
-  propertyId String
-  createdAt  DateTime @default(now())
-  
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, propertyId])
-  @@index([userId])
-  @@index([propertyId])
-}
-
-// Message model
-model Message {
-  id             String      @id @default(cuid())
-  content        String
-  read           Boolean     @default(false)
-  createdAt      DateTime    @default(now())
-  
-  // Relations
-  senderId       String
-  sender         User        @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiverId     String
-  receiver       User        @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  @@index([senderId])
-  @@index([receiverId])
-  @@index([conversationId])
-}
-
-// Conversation model
 model Conversation {
-  id          String    @id @default(cuid())
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+
   // Relations
-  participants User[]    @relation("UserConversations")
-  messages     Message[]
+  user      User      @relation(fields: [userId], references: [id])
+  messages  Message[]
 }
 
-// Notification model
+model Message {
+  id             String   @id @default(cuid())
+  content        String
+  read           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  conversationId String
+  senderId       String
+  receiverId     String
+
+  // Relations
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  sender         User         @relation(fields: [senderId], references: [id])
+}
+
 model Notification {
   id        String   @id @default(cuid())
   title     String
@@ -149,58 +89,57 @@ model Notification {
   data      Json?
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
-  
-  // Relations
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-}
-
-// Payment model
-model Payment {
-  id            String   @id @default(cuid())
-  amount        Float
-  currency      String
-  method        String
-  status        String // "pending", "completed", "failed"
-  description   String
-  reference     String?
-  transactionId String?
-  createdAt     DateTime @default(now())
-  
   // Relations
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([status])
+  user      User     @relation(fields: [userId], references: [id])
 }
 
-// Device model for push notifications
+model Payment {
+  id           String   @id @default(cuid())
+  amount       Float
+  currency     String   @default("MZN")
+  method       String   // mpesa, emola
+  status       String   // pending, completed, failed
+  description  String
+  transactionId String?
+  createdAt    DateTime @default(now())
+  userId       String
+
+  // Relations
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model Favorite {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  userId     String
+  propertyId String
+
+  // Relations
+  user       User     @relation(fields: [userId], references: [id])
+  property   Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([userId, propertyId])
+}
+
 model Device {
   id        String   @id @default(cuid())
   token     String   @unique
-  platform  String
+  platform  String?  // ios, android, web
   createdAt DateTime @default(now())
-  
-  // Relations
+  updatedAt DateTime @updatedAt
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
+  // Relations
+  user      User     @relation(fields: [userId], references: [id])
 }
 
-// Settings model
 model Settings {
-  id                String  @id @default("settings")
-  premiumMonthlyPrice Float  @default(1500)
-  premiumQuarterlyPrice Float @default(4000)
-  premiumYearlyPrice Float   @default(15000)
-  boost7DaysPrice   Float   @default(500)
-  boost15DaysPrice  Float   @default(900)
-  boost30DaysPrice  Float   @default(1600)
-  currency          String  @default("MZN")
-  maxImagesPerProperty Int  @default(10)
-  maxPropertiesForFreeUsers Int @default(3)
+  id             String  @id @default(cuid())
+  userId         String  @unique
+  newMessages    Boolean @default(true)
+  propertyViews  Boolean @default(true)
+  paymentUpdates Boolean @default(true)
+  promotions     Boolean @default(true)
 }

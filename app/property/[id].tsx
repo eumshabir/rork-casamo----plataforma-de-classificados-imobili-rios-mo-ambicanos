@@ -10,7 +10,7 @@ import {
   Platform,
   Alert,
   Share,
-  FlatList
+  FlatList as RNFlatList
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
@@ -336,13 +336,14 @@ export default function PropertyDetailScreen() {
           {similarProperties.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Imóveis Semelhantes</Text>
-              <FlatList
+              <RNFlatList
                 data={similarProperties}
                 renderItem={renderSimilarProperty}
                 keyExtractor={(item) => item.id}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.similarPropertiesContainer}
+                nestedScrollEnabled={true}
               />
             </View>
           )}

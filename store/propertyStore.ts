@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Property, PropertyFilter, PropertyType, ListingType, Amenity } from '@/types/property';
+import { Property, PropertyFilter } from '@/types/property';
 import { propertyService } from '@/services/propertyService';
 
 interface PropertyState {

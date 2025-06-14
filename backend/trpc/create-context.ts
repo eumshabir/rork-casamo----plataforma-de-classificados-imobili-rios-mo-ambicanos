@@ -1,21 +1,75 @@
-import { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
-import { initTRPC } from "@trpc/server";
-import superjson from "superjson";
+import { initTRPC, TRPCError } from '@trpc/server';
+import { z } from 'zod';
+import { type CreateNextContextOptions } from '@trpc/server/adapters/next';
+import { getAuth } from '@clerk/nextjs/server';
+import { PrismaClient } from '@prisma/client';
 
-// Context creation function
-export const createContext = async (opts: FetchCreateContextFnOptions) => {
+// Initialize Prisma client
+const prisma = new PrismaClient();
+
+export const createContext = async (opts: CreateNextContextOptions) => {
+  const { req } = opts;
+  
+  // Get the session from the request
+  const auth = getAuth(req);
+  const userId = auth.userId;
+  
   return {
-    req: opts.req,
-    // You can add more context items here like database connections, auth, etc.
+    userId,
+    db: prisma,
+    auth,
   };
 };
 
-export type Context = Awaited<ReturnType<typeof createContext>>;
+const t = initTRPC.context<typeof createContext>().create();
 
-// Initialize tRPC
-const t = initTRPC.context<Context>().create({
-  transformer: superjson,
+export const router = t.router;
+export const publicProcedure = t.procedure;
+
+// Middleware to check if user is authenticated
+const isAuthed = t.middleware(({ next, ctx }) => {
+  if (!ctx.userId) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'You must be logged in to access this resource',
+    });
+  }
+  return next({
+    ctx: {
+      userId: ctx.userId,
+    },
+  });
 });
 
-export const createTRPCRouter = t.router;
-export const publicProcedure = t.procedure;
+export const protectedProcedure = t.procedure.use(isAuthed);
+
+// Middleware to check if user is an admin
+const isAdmin = t.middleware(async ({ next, ctx }) => {
+  if (!ctx.userId) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'You must be logged in to access this resource',
+    });
+  }
+  
+  // Get the user from the database
+  const user = await ctx.db.user.findUnique({
+    where: { id: ctx.userId },
+  });
+  
+  if (!user || user.role !== 'admin') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'You do not have permission to access this resource',
+    });
+  }
+  
+  return next({
+    ctx: {
+      userId: ctx.userId,
+      user,
+    },
+  });
+});
+
+export const adminProcedure = t.procedure.use(isAdmin);
