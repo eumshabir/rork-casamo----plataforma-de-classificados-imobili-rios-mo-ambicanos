@@ -91,11 +91,6 @@ export default function PremiumScreen() {
     }
   };
   
-  // Check if user is already premium
-  const isPremium = user?.role === 'premium';
-  const premiumUntil = user?.premiumUntil ? new Date(user.premiumUntil) : null;
-  const isPremiumActive = isPremium && premiumUntil && premiumUntil > new Date();
-  
   return (
     <ScrollView 
       style={styles.container}
@@ -116,21 +111,6 @@ export default function PremiumScreen() {
           Destaque seus imóveis e aumente suas chances de venda ou arrendamento
         </Text>
       </View>
-      
-      {isPremiumActive && (
-        <View style={styles.premiumActiveContainer}>
-          <View style={styles.premiumBadge}>
-            <Crown size={20} color="white" />
-            <Text style={styles.premiumBadgeText}>Premium Ativo</Text>
-          </View>
-          <Text style={styles.premiumActiveText}>
-            Sua conta premium está ativa até {premiumUntil?.toLocaleDateString('pt-BR')}
-          </Text>
-          <Text style={styles.premiumActiveSubtext}>
-            Você pode renovar ou atualizar seu plano a qualquer momento.
-          </Text>
-        </View>
-      )}
       
       {/* Plan Selection */}
       <View style={styles.planSelector}>
@@ -238,7 +218,7 @@ export default function PremiumScreen() {
       
       {/* Subscribe Button */}
       <Button
-        title={isPremiumActive ? "Renovar Assinatura" : "Assinar Agora"}
+        title="Assinar Agora"
         onPress={handleSubscribe}
         style={styles.subscribeButton}
       />
@@ -276,40 +256,6 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: Colors.textLight,
-    textAlign: 'center',
-  },
-  premiumActiveContainer: {
-    backgroundColor: '#F0F9FF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
-    alignItems: 'center',
-  },
-  premiumBadge: {
-    flexDirection: 'row',
-    backgroundColor: Colors.premium,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  premiumBadgeText: {
-    color: 'white',
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  premiumActiveText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  premiumActiveSubtext: {
-    fontSize: 14,
     color: Colors.textLight,
     textAlign: 'center',
   },

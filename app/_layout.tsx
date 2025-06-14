@@ -4,16 +4,11 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { useAuthStore } from "@/store/authStore";
-import { trpc, trpcClient } from "@/lib/trpc";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
   initialRouteName: "(tabs)",
 };
-
-// Create a client
-const queryClient = new QueryClient();
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -46,13 +41,7 @@ export default function RootLayout() {
     return null;
   }
 
-  return (
-    <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>
-        <RootLayoutNav />
-      </QueryClientProvider>
-    </trpc.Provider>
-  );
+  return <RootLayoutNav />;
 }
 
 function RootLayoutNav() {

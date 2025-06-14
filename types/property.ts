@@ -6,10 +6,6 @@ export interface Location {
   province: string;
   city: string;
   neighborhood?: string;
-  district?: string;
-  address?: string;
-  latitude?: number;
-  longitude?: number;
   coordinates?: {
     latitude: number;
     longitude: number;
@@ -39,10 +35,8 @@ export interface Property {
   images: string[];
   owner: Owner;
   featured: boolean;
-  boostedUntil?: string;
   createdAt: string;
   views: number;
-  userId?: string;
 }
 
 export interface PropertyFilter {
@@ -54,5 +48,7 @@ export interface PropertyFilter {
   maxPrice?: number;
   minBedrooms?: number;
   minBathrooms?: number;
+  minArea?: number;
+  maxArea?: number;
   amenities?: Amenity[];
 }

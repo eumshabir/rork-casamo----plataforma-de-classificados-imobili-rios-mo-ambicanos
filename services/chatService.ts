@@ -1,5 +1,4 @@
-import { handleApiError, shouldUseTRPC } from './api';
-import { trpcClient } from '@/lib/trpc';
+import { apiClient, handleApiError } from './api';
 
 export interface ChatMessage {
   id: string;
@@ -117,48 +116,40 @@ export const chatService = {
   // Get all conversations for the current user
   getConversations: async (): Promise<ChatConversation[]> => {
     try {
-      // Try to use tRPC first
-      if (await shouldUseTRPC()) {
-        return await trpcClient.chat.getConversations.query();
-      }
-      
-      // If tRPC is not available, use mock
+      // Try to use the real API first
+      const response = await apiClient.get('/chat/conversations');
+      return response.data;
+    } catch (error) {
+      // If API is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 800));
       return MOCK_CONVERSATIONS;
-    } catch (error) {
-      throw new Error(handleApiError(error));
     }
   },
   
   // Get messages for a specific conversation
   getMessages: async (conversationId: string): Promise<ChatMessage[]> => {
     try {
-      // Try to use tRPC first
-      if (await shouldUseTRPC()) {
-        return await trpcClient.chat.getMessages.query({ conversationId });
-      }
-      
-      // If tRPC is not available, use mock
+      // Try to use the real API first
+      const response = await apiClient.get(`/chat/conversations/${conversationId}/messages`);
+      return response.data;
+    } catch (error) {
+      // If API is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 600));
       return MOCK_MESSAGES[conversationId] || [];
-    } catch (error) {
-      throw new Error(handleApiError(error));
     }
   },
   
   // Send a message
   sendMessage: async (conversationId: string, content: string, receiverId: string): Promise<ChatMessage> => {
     try {
-      // Try to use tRPC first
-      if (await shouldUseTRPC()) {
-        return await trpcClient.chat.sendMessage.mutate({
-          conversationId,
-          content,
-          receiverId,
-        });
-      }
-      
-      // If tRPC is not available, use mock
+      // Try to use the real API first
+      const response = await apiClient.post(`/chat/conversations/${conversationId}/messages`, {
+        content,
+        receiverId
+      });
+      return response.data;
+    } catch (error) {
+      // If API is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 500));
       
       const newMessage: ChatMessage = {
@@ -186,23 +177,20 @@ export const chatService = {
       }
       
       return newMessage;
-    } catch (error) {
-      throw new Error(handleApiError(error));
     }
   },
   
   // Create a new conversation
   createConversation: async (receiverId: string, initialMessage: string): Promise<ChatConversation> => {
     try {
-      // Try to use tRPC first
-      if (await shouldUseTRPC()) {
-        return await trpcClient.chat.createConversation.mutate({
-          receiverId,
-          initialMessage,
-        });
-      }
-      
-      // If tRPC is not available, use mock
+      // Try to use the real API first
+      const response = await apiClient.post('/chat/conversations', {
+        receiverId,
+        initialMessage
+      });
+      return response.data;
+    } catch (error) {
+      // If API is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 800));
       
       const newConversationId = `conv-${Date.now()}`;
@@ -237,21 +225,17 @@ export const chatService = {
       MOCK_MESSAGES[newConversationId] = [newMessage];
       
       return newConversation;
-    } catch (error) {
-      throw new Error(handleApiError(error));
     }
   },
   
   // Mark messages as read
   markAsRead: async (conversationId: string): Promise<boolean> => {
     try {
-      // Try to use tRPC first
-      if (await shouldUseTRPC()) {
-        const result = await trpcClient.chat.markAsRead.mutate({ conversationId });
-        return result.success;
-      }
-      
-      // If tRPC is not available, use mock
+      // Try to use the real API first
+      await apiClient.put(`/chat/conversations/${conversationId}/read`);
+      return true;
+    } catch (error) {
+      // If API is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 300));
       
       // Update mock data
@@ -270,21 +254,17 @@ export const chatService = {
       }
       
       return true;
-    } catch (error) {
-      throw new Error(handleApiError(error));
     }
   },
   
   // Delete a conversation
   deleteConversation: async (conversationId: string): Promise<boolean> => {
     try {
-      // Try to use tRPC first
-      if (await shouldUseTRPC()) {
-        const result = await trpcClient.chat.deleteConversation.mutate({ conversationId });
-        return result.success;
-      }
-      
-      // If tRPC is not available, use mock
+      // Try to use the real API first
+      await apiClient.delete(`/chat/conversations/${conversationId}`);
+      return true;
+    } catch (error) {
+      // If API is not available, use mock
       await new Promise(resolve => setTimeout(resolve, 500));
       
       // Remove from mock data
@@ -296,8 +276,6 @@ export const chatService = {
       delete MOCK_MESSAGES[conversationId];
       
       return true;
-    } catch (error) {
-      throw new Error(handleApiError(error));
     }
   }
 };

@@ -77,21 +77,6 @@ export default function LoginScreen() {
     }
   };
   
-  // For demo purposes, add a quick login option
-  const handleDemoLogin = async () => {
-    setEmail('joao@example.com');
-    setPassword('password123');
-    
-    setTimeout(async () => {
-      try {
-        await login('joao@example.com', 'password123');
-        router.replace('/');
-      } catch (error) {
-        // Error is already handled in the store
-      }
-    }, 500);
-  };
-  
   return (
     <ScrollView 
       style={styles.container}
@@ -151,13 +136,6 @@ export default function LoginScreen() {
           loading={isLoading}
           style={styles.loginButton}
         />
-        
-        <TouchableOpacity 
-          style={styles.demoLoginButton}
-          onPress={handleDemoLogin}
-        >
-          <Text style={styles.demoLoginText}>Entrar com conta demo</Text>
-        </TouchableOpacity>
       </View>
       
       <View style={styles.dividerContainer}>
@@ -236,15 +214,6 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     marginBottom: 16,
-  },
-  demoLoginButton: {
-    alignSelf: 'center',
-    marginBottom: 8,
-  },
-  demoLoginText: {
-    fontSize: 14,
-    color: Colors.primary,
-    fontWeight: '500',
   },
   dividerContainer: {
     flexDirection: 'row',
