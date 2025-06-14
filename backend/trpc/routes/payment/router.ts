@@ -146,7 +146,15 @@ export const paymentRouter = router({
       orderBy: { createdAt: "desc" },
     });
     
-    return payments.map((payment) => ({
+    return payments.map((payment: {
+      id: string;
+      amount: number;
+      currency: string;
+      description: string;
+      status: string;
+      method: string;
+      createdAt: Date;
+    }) => ({
       id: payment.id,
       amount: payment.amount,
       currency: payment.currency,

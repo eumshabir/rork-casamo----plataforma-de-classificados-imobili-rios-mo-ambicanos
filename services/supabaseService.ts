@@ -1,7 +1,20 @@
 import { supabase } from '@/lib/supabase';
 import { User, UserRole } from '@/types/user';
-import { Property, PropertyFilter } from '@/types/property';
+import { Property } from '@/types/property';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Define PropertyFilter interface if it's not exported from types/property
+interface PropertyFilter {
+  type?: string;
+  listingType?: string;
+  province?: string;
+  city?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minBedrooms?: number;
+  minBathrooms?: number;
+  amenities?: string[];
+}
 
 // Helper function to safely access Supabase auth
 const supabaseHelper = {
@@ -481,7 +494,7 @@ export const supabaseAuthService = {
         .insert({
           user_id: user.id,
           amount: amount,
-          currency: plan.currency || 'MZN',
+          currency: plan?.currency || 'MZN',
           method: paymentMethod,
           status: 'completed',
           description: `Premium subscription (${planId})`,
