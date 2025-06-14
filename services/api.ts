@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { trpcClient } from '@/lib/trpc';
+import { supabase } from '@/lib/supabase';
 
 // Base URL for the API
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.casamoc.com/v1';
@@ -134,9 +135,26 @@ export const handleApiError = (error: any): string => {
   return error.message || 'Ocorreu um erro. Tente novamente.';
 };
 
+// Function to check if we should use Supabase, tRPC or fallback to mock data
+export const shouldUseSupabase = async (): Promise<boolean> => {
+  try {
+    // Check if Supabase is configured
+    const { data } = await supabase.from('settings').select('*').limit(1);
+    return !!data;
+  } catch (error) {
+    console.log('Supabase not available:', error);
+    return false;
+  }
+};
+
 // Function to check if we should use tRPC or fallback to mock data
 export const shouldUseTRPC = async (): Promise<boolean> => {
   try {
+    // First check if Supabase is available
+    if (await shouldUseSupabase()) {
+      return false; // Prefer Supabase over tRPC
+    }
+    
     // Try to make a simple tRPC request to check if the backend is available
     await trpcClient.auth.me.query();
     return true;

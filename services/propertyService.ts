@@ -1,18 +1,24 @@
 import { Property, PropertyFilter } from '@/types/property';
-import { handleApiError, shouldUseTRPC } from './api';
+import { handleApiError, shouldUseTRPC, shouldUseSupabase } from './api';
 import { mockProperties } from '@/mocks/properties';
 import { trpcClient } from '@/lib/trpc';
+import { supabasePropertyService } from './supabaseService';
 
 export const propertyService = {
   // Get all properties with optional filters
   getProperties: async (filter?: PropertyFilter): Promise<Property[]> => {
     try {
-      // Try to use tRPC first
+      // Try to use Supabase first
+      if (await shouldUseSupabase()) {
+        return await supabasePropertyService.getProperties(filter);
+      }
+      
+      // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
         return await trpcClient.property.getProperties.query(filter);
       }
       
-      // If tRPC is not available, use mock
+      // If neither is available, use mock
       await new Promise(resolve => setTimeout(resolve, 800));
       
       // Apply filters if any
@@ -65,12 +71,17 @@ export const propertyService = {
   // Get featured properties
   getFeaturedProperties: async (): Promise<Property[]> => {
     try {
-      // Try to use tRPC first
+      // Try to use Supabase first
+      if (await shouldUseSupabase()) {
+        return await supabasePropertyService.getFeaturedProperties();
+      }
+      
+      // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
         return await trpcClient.property.getFeaturedProperties.query();
       }
       
-      // If tRPC is not available, use mock
+      // If neither is available, use mock
       await new Promise(resolve => setTimeout(resolve, 500));
       
       const featured = mockProperties.filter(p => p.featured);
@@ -83,12 +94,17 @@ export const propertyService = {
   // Get user's properties
   getUserProperties: async (): Promise<Property[]> => {
     try {
-      // Try to use tRPC first
+      // Try to use Supabase first
+      if (await shouldUseSupabase()) {
+        return await supabasePropertyService.getUserProperties();
+      }
+      
+      // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
         return await trpcClient.property.getUserProperties.query();
       }
       
-      // If tRPC is not available, use mock
+      // If neither is available, use mock
       await new Promise(resolve => setTimeout(resolve, 500));
       
       // For demo, we'll just use the first two properties
@@ -102,12 +118,17 @@ export const propertyService = {
   // Get a single property by ID
   getProperty: async (id: string): Promise<Property> => {
     try {
-      // Try to use tRPC first
+      // Try to use Supabase first
+      if (await shouldUseSupabase()) {
+        return await supabasePropertyService.getProperty(id);
+      }
+      
+      // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
         return await trpcClient.property.getProperty.query({ id });
       }
       
-      // If tRPC is not available, use mock
+      // If neither is available, use mock
       await new Promise(resolve => setTimeout(resolve, 300));
       
       const property = mockProperties.find(p => p.id === id);
@@ -124,12 +145,17 @@ export const propertyService = {
   // Create a new property
   createProperty: async (propertyData: Omit<Property, 'id' | 'createdAt' | 'views'>): Promise<Property> => {
     try {
-      // Try to use tRPC first
+      // Try to use Supabase first
+      if (await shouldUseSupabase()) {
+        return await supabasePropertyService.createProperty(propertyData);
+      }
+      
+      // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
         return await trpcClient.property.createProperty.mutate(propertyData);
       }
       
-      // If tRPC is not available, use mock
+      // If neither is available, use mock
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       const newProperty: Property = {
@@ -151,12 +177,17 @@ export const propertyService = {
   // Update an existing property
   updateProperty: async (id: string, updates: Partial<Property>): Promise<Property> => {
     try {
-      // Try to use tRPC first
+      // Try to use Supabase first
+      if (await shouldUseSupabase()) {
+        return await supabasePropertyService.updateProperty(id, updates);
+      }
+      
+      // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
         return await trpcClient.property.updateProperty.mutate({ id, data: updates });
       }
       
-      // If tRPC is not available, use mock
+      // If neither is available, use mock
       await new Promise(resolve => setTimeout(resolve, 800));
       
       const propertyIndex = mockProperties.findIndex(p => p.id === id);
@@ -180,13 +211,18 @@ export const propertyService = {
   // Delete a property
   deleteProperty: async (id: string): Promise<boolean> => {
     try {
-      // Try to use tRPC first
+      // Try to use Supabase first
+      if (await shouldUseSupabase()) {
+        return await supabasePropertyService.deleteProperty(id);
+      }
+      
+      // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
         const result = await trpcClient.property.deleteProperty.mutate({ id });
         return result.success;
       }
       
-      // If tRPC is not available, use mock
+      // If neither is available, use mock
       await new Promise(resolve => setTimeout(resolve, 600));
       
       const propertyIndex = mockProperties.findIndex(p => p.id === id);
@@ -205,6 +241,11 @@ export const propertyService = {
   // Upload property images
   uploadPropertyImages: async (propertyId: string, images: FormData): Promise<string[]> => {
     try {
+      // Try to use Supabase first
+      if (await shouldUseSupabase()) {
+        return await supabasePropertyService.uploadPropertyImages(propertyId, images);
+      }
+      
       // In a real app, you would upload images to a storage service like AWS S3
       // For now, we'll just return mock image URLs
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -221,12 +262,17 @@ export const propertyService = {
   // Get property statistics
   getPropertyStats: async (propertyId: string): Promise<any> => {
     try {
-      // Try to use tRPC first
+      // Try to use Supabase first
+      if (await shouldUseSupabase()) {
+        return await supabasePropertyService.getPropertyStats(propertyId);
+      }
+      
+      // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
         return await trpcClient.property.getPropertyStats.query({ id: propertyId });
       }
       
-      // If tRPC is not available, use mock
+      // If neither is available, use mock
       await new Promise(resolve => setTimeout(resolve, 700));
       
       // Mock statistics
@@ -244,12 +290,17 @@ export const propertyService = {
   // Search properties
   searchProperties: async (query: string): Promise<Property[]> => {
     try {
-      // Try to use tRPC first
+      // Try to use Supabase first
+      if (await shouldUseSupabase()) {
+        return await supabasePropertyService.searchProperties(query);
+      }
+      
+      // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
         return await trpcClient.property.searchProperties.query({ query });
       }
       
-      // If tRPC is not available, use mock
+      // If neither is available, use mock
       await new Promise(resolve => setTimeout(resolve, 600));
       
       // Simple search in title and description
@@ -267,13 +318,18 @@ export const propertyService = {
   // Add property to favorites
   addToFavorites: async (propertyId: string): Promise<boolean> => {
     try {
-      // Try to use tRPC first
+      // Try to use Supabase first
+      if (await shouldUseSupabase()) {
+        return await supabasePropertyService.addToFavorites(propertyId);
+      }
+      
+      // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
         const result = await trpcClient.property.addToFavorites.mutate({ propertyId });
         return result.success;
       }
       
-      // If tRPC is not available, use mock
+      // If neither is available, use mock
       await new Promise(resolve => setTimeout(resolve, 300));
       
       // In a real app, we would save this to a database
@@ -286,13 +342,18 @@ export const propertyService = {
   // Remove property from favorites
   removeFromFavorites: async (propertyId: string): Promise<boolean> => {
     try {
-      // Try to use tRPC first
+      // Try to use Supabase first
+      if (await shouldUseSupabase()) {
+        return await supabasePropertyService.removeFromFavorites(propertyId);
+      }
+      
+      // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
         const result = await trpcClient.property.removeFromFavorites.mutate({ propertyId });
         return result.success;
       }
       
-      // If tRPC is not available, use mock
+      // If neither is available, use mock
       await new Promise(resolve => setTimeout(resolve, 300));
       
       // In a real app, we would remove this from a database
@@ -305,12 +366,17 @@ export const propertyService = {
   // Get user's favorite properties
   getFavorites: async (): Promise<Property[]> => {
     try {
-      // Try to use tRPC first
+      // Try to use Supabase first
+      if (await shouldUseSupabase()) {
+        return await supabasePropertyService.getFavorites();
+      }
+      
+      // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
         return await trpcClient.property.getFavorites.query();
       }
       
-      // If tRPC is not available, use mock
+      // If neither is available, use mock
       await new Promise(resolve => setTimeout(resolve, 500));
       
       // For demo, we'll just use a few random properties
@@ -324,7 +390,12 @@ export const propertyService = {
   // Boost a property
   boostProperty: async (propertyId: string, boostOptionId: string, paymentMethod: string, phoneNumber: string): Promise<any> => {
     try {
-      // Try to use tRPC first
+      // Try to use Supabase first
+      if (await shouldUseSupabase()) {
+        return await supabasePropertyService.boostProperty(propertyId, boostOptionId, paymentMethod, phoneNumber);
+      }
+      
+      // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
         return await trpcClient.payment.boostProperty.mutate({
           propertyId,
@@ -334,7 +405,7 @@ export const propertyService = {
         });
       }
       
-      // If tRPC is not available, use mock
+      // If neither is available, use mock
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Mock boost response
