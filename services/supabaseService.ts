@@ -1464,13 +1464,13 @@ export const supabasePropertyService = {
       
       if (boostOptionId === '7days') {
         boostedUntil.setDate(boostedUntil.getDate() + 7);
-        boostPrice = boostSettings.boost_7days_price;
+        boostPrice = boostSettings.boost_7days_price || 500;
       } else if (boostOptionId === '15days') {
         boostedUntil.setDate(boostedUntil.getDate() + 15);
-        boostPrice = boostSettings.boost_15days_price;
+        boostPrice = boostSettings.boost_15days_price || 900;
       } else if (boostOptionId === '30days') {
         boostedUntil.setDate(boostedUntil.getDate() + 30);
-        boostPrice = boostSettings.boost_30days_price;
+        boostPrice = boostSettings.boost_30days_price || 1600;
       } else {
         throw new Error('Invalid boost option');
       }
@@ -1494,7 +1494,7 @@ export const supabasePropertyService = {
         .insert({
           user_id: user.id,
           amount: boostPrice,
-          currency: boostSettings.currency,
+          currency: boostSettings.currency || 'MZN',
           method: paymentMethod,
           status: 'completed',
           description: `Property boost (${boostOptionId})`,
