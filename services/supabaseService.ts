@@ -22,7 +22,47 @@ export const supabaseAuthService = {
         .single();
         
       if (profileError) {
-        throw profileError;
+        // If profile doesn't exist, create one
+        if (profileError.code === 'PGRST116') {
+          const newProfile = {
+            id: user.id,
+            name: user.user_metadata?.name || '',
+            email: user.email,
+            phone: user.user_metadata?.phone || '',
+            role: 'user' as UserRole,
+            verified: false,
+            created_at: new Date().toISOString(),
+          };
+          
+          const { data: createdProfile, error: createError } = await supabase
+            .from('users')
+            .insert(newProfile)
+            .select()
+            .single();
+            
+          if (createError) throw createError;
+          
+          const userData: User = {
+            id: user.id,
+            name: createdProfile.name,
+            email: createdProfile.email,
+            phone: createdProfile.phone,
+            role: createdProfile.role,
+            verified: createdProfile.verified,
+            premiumUntil: createdProfile.premium_until,
+            createdAt: createdProfile.created_at,
+          };
+          
+          // Store user data
+          await AsyncStorage.setItem('user_data', JSON.stringify(userData));
+          
+          return { 
+            user: userData, 
+            token: session.access_token 
+          };
+        } else {
+          throw profileError;
+        }
       }
       
       // Combine auth user and profile data
@@ -33,8 +73,8 @@ export const supabaseAuthService = {
         phone: profile.phone || user.user_metadata?.phone || '',
         role: profile.role || 'user',
         verified: profile.verified || false,
-        premiumUntil: profile.premiumUntil || null,
-        createdAt: profile.createdAt || user.created_at,
+        premiumUntil: profile.premium_until || null,
+        createdAt: profile.created_at || user.created_at,
       };
       
       // Store user data
@@ -76,7 +116,7 @@ export const supabaseAuthService = {
           phone: userData.phone,
           role: 'user',
           verified: false,
-          createdAt: new Date().toISOString(),
+          created_at: new Date().toISOString(),
         })
         .select()
         .single();
@@ -92,7 +132,7 @@ export const supabaseAuthService = {
         phone: profile.phone,
         role: profile.role,
         verified: profile.verified,
-        createdAt: profile.createdAt,
+        createdAt: profile.created_at,
       };
       
       // Store user data
@@ -110,19 +150,40 @@ export const supabaseAuthService = {
   // Google OAuth login
   loginWithGoogle: async (): Promise<{ user: User; token: string }> => {
     try {
-      const { session, user } = await supabaseHelper.auth.signInWithOAuth('google');
+      const { data, error } = await supabaseHelper.auth.signInWithOAuth('google');
       
-      if (!user) {
-        throw new Error('Google login failed');
+      if (error) {
+        throw error;
       }
       
+      // Wait for the OAuth flow to complete
+      // In a real app, you would handle the redirect and get the session
+      // For now, we'll just get the current session
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !sessionData.session) {
+        throw sessionError || new Error('Failed to get session after Google login');
+      }
+      
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !userData.user) {
+        throw userError || new Error('Failed to get user after Google login');
+      }
+      
+      const user = userData.user;
+      
       // Check if user exists in the profiles table
-      const { data: existingProfile } = await supabase
+      const { data: existingProfile, error: profileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single();
         
+      if (profileError && profileError.code !== 'PGRST116') {
+        throw profileError;
+      }
+      
       // If not, create a new profile
       if (!existingProfile) {
         await supabase
@@ -133,38 +194,38 @@ export const supabaseAuthService = {
             email: user.email,
             role: 'user',
             verified: true, // Google accounts are considered verified
-            createdAt: user.created_at,
+            created_at: new Date().toISOString(),
           });
       }
       
       // Get the latest profile data
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile, error: getProfileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single();
         
-      if (profileError) {
-        throw profileError;
+      if (getProfileError) {
+        throw getProfileError;
       }
       
-      const userData: User = {
+      const userInfo: User = {
         id: user.id,
         name: profile.name || user.user_metadata?.name || '',
         email: user.email || '',
         phone: profile.phone || '',
         role: profile.role || 'user',
         verified: profile.verified || true,
-        premiumUntil: profile.premiumUntil || null,
-        createdAt: profile.createdAt || user.created_at,
+        premiumUntil: profile.premium_until || null,
+        createdAt: profile.created_at || user.created_at,
       };
       
       // Store user data
-      await AsyncStorage.setItem('user_data', JSON.stringify(userData));
+      await AsyncStorage.setItem('user_data', JSON.stringify(userInfo));
       
       return { 
-        user: userData, 
-        token: session?.access_token || '' 
+        user: userInfo, 
+        token: sessionData.session.access_token
       };
     } catch (error: any) {
       throw new Error(error.message || 'Google login failed');
@@ -174,19 +235,40 @@ export const supabaseAuthService = {
   // Facebook OAuth login
   loginWithFacebook: async (): Promise<{ user: User; token: string }> => {
     try {
-      const { session, user } = await supabaseHelper.auth.signInWithOAuth('facebook');
+      const { data, error } = await supabaseHelper.auth.signInWithOAuth('facebook');
       
-      if (!user) {
-        throw new Error('Facebook login failed');
+      if (error) {
+        throw error;
       }
       
+      // Wait for the OAuth flow to complete
+      // In a real app, you would handle the redirect and get the session
+      // For now, we'll just get the current session
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !sessionData.session) {
+        throw sessionError || new Error('Failed to get session after Facebook login');
+      }
+      
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !userData.user) {
+        throw userError || new Error('Failed to get user after Facebook login');
+      }
+      
+      const user = userData.user;
+      
       // Check if user exists in the profiles table
-      const { data: existingProfile } = await supabase
+      const { data: existingProfile, error: profileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single();
         
+      if (profileError && profileError.code !== 'PGRST116') {
+        throw profileError;
+      }
+      
       // If not, create a new profile
       if (!existingProfile) {
         await supabase
@@ -197,38 +279,38 @@ export const supabaseAuthService = {
             email: user.email,
             role: 'user',
             verified: true, // Facebook accounts are considered verified
-            createdAt: user.created_at,
+            created_at: new Date().toISOString(),
           });
       }
       
       // Get the latest profile data
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile, error: getProfileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single();
         
-      if (profileError) {
-        throw profileError;
+      if (getProfileError) {
+        throw getProfileError;
       }
       
-      const userData: User = {
+      const userInfo: User = {
         id: user.id,
         name: profile.name || user.user_metadata?.name || '',
         email: user.email || '',
         phone: profile.phone || '',
         role: profile.role || 'user',
         verified: profile.verified || true,
-        premiumUntil: profile.premiumUntil || null,
-        createdAt: profile.createdAt || user.created_at,
+        premiumUntil: profile.premium_until || null,
+        createdAt: profile.created_at || user.created_at,
       };
       
       // Store user data
-      await AsyncStorage.setItem('user_data', JSON.stringify(userData));
+      await AsyncStorage.setItem('user_data', JSON.stringify(userInfo));
       
       return { 
-        user: userData, 
-        token: session?.access_token || '' 
+        user: userInfo, 
+        token: sessionData.session.access_token
       };
     } catch (error: any) {
       throw new Error(error.message || 'Facebook login failed');
@@ -272,7 +354,44 @@ export const supabaseAuthService = {
         .single();
         
       if (profileError) {
-        throw profileError;
+        // If profile doesn't exist, create one
+        if (profileError.code === 'PGRST116') {
+          const newProfile = {
+            id: user.id,
+            name: user.user_metadata?.name || '',
+            email: user.email,
+            phone: user.user_metadata?.phone || '',
+            role: 'user' as UserRole,
+            verified: false,
+            created_at: new Date().toISOString(),
+          };
+          
+          const { data: createdProfile, error: createError } = await supabase
+            .from('users')
+            .insert(newProfile)
+            .select()
+            .single();
+            
+          if (createError) throw createError;
+          
+          const userData: User = {
+            id: user.id,
+            name: createdProfile.name,
+            email: createdProfile.email,
+            phone: createdProfile.phone,
+            role: createdProfile.role,
+            verified: createdProfile.verified,
+            premiumUntil: createdProfile.premium_until,
+            createdAt: createdProfile.created_at,
+          };
+          
+          // Update stored user data
+          await AsyncStorage.setItem('user_data', JSON.stringify(userData));
+          
+          return userData;
+        } else {
+          throw profileError;
+        }
       }
       
       const userData: User = {
@@ -282,8 +401,8 @@ export const supabaseAuthService = {
         phone: profile.phone || '',
         role: profile.role || 'user',
         verified: profile.verified || false,
-        premiumUntil: profile.premiumUntil || null,
-        createdAt: profile.createdAt || user.created_at,
+        premiumUntil: profile.premium_until || null,
+        createdAt: profile.created_at || user.created_at,
       };
       
       // Update stored user data
@@ -306,10 +425,18 @@ export const supabaseAuthService = {
         throw new Error('User not authenticated');
       }
       
+      // Convert camelCase to snake_case for Supabase
+      const dbUpdates: any = {};
+      if (updates.name) dbUpdates.name = updates.name;
+      if (updates.phone) dbUpdates.phone = updates.phone;
+      if (updates.role) dbUpdates.role = updates.role;
+      if (updates.verified !== undefined) dbUpdates.verified = updates.verified;
+      if (updates.premiumUntil) dbUpdates.premium_until = updates.premiumUntil;
+      
       // Update profile in the users table
       const { data: updatedProfile, error: profileError } = await supabase
         .from('users')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', user.id)
         .select()
         .single();
@@ -325,8 +452,8 @@ export const supabaseAuthService = {
         phone: updatedProfile.phone,
         role: updatedProfile.role,
         verified: updatedProfile.verified,
-        premiumUntil: updatedProfile.premiumUntil,
-        createdAt: updatedProfile.createdAt,
+        premiumUntil: updatedProfile.premium_until,
+        createdAt: updatedProfile.created_at,
       };
       
       // Update stored user data
@@ -348,23 +475,57 @@ export const supabaseAuthService = {
       }
       
       // Get plan details
-      const { data: plan, error: planError } = await supabase
+      const { data: settings, error: settingsError } = await supabase
         .from('settings')
         .select('*')
         .single();
         
-      if (planError) {
-        throw planError;
+      if (settingsError) {
+        // If settings don't exist, create default settings
+        if (settingsError.code === 'PGRST116') {
+          const defaultSettings = {
+            id: 'settings',
+            premium_monthly_price: 1500,
+            premium_quarterly_price: 4000,
+            premium_yearly_price: 15000,
+            boost_7days_price: 500,
+            boost_15days_price: 900,
+            boost_30days_price: 1600,
+            currency: 'MZN',
+            max_images_per_property: 10,
+            max_properties_for_free_users: 3
+          };
+          
+          const { data: createdSettings, error: createError } = await supabase
+            .from('settings')
+            .insert(defaultSettings)
+            .select()
+            .single();
+            
+          if (createError) throw createError;
+          
+          // Use created settings
+          const plan = createdSettings;
+        } else {
+          throw settingsError;
+        }
       }
+      
+      const plan = settings;
       
       // Calculate premium expiration date based on plan
       const premiumUntil = new Date();
+      let amount = 0;
+      
       if (planId === 'monthly') {
         premiumUntil.setMonth(premiumUntil.getMonth() + 1);
+        amount = plan.premium_monthly_price;
       } else if (planId === 'quarterly') {
         premiumUntil.setMonth(premiumUntil.getMonth() + 3);
+        amount = plan.premium_quarterly_price;
       } else if (planId === 'yearly') {
         premiumUntil.setFullYear(premiumUntil.getFullYear() + 1);
+        amount = plan.premium_yearly_price;
       } else {
         throw new Error('Invalid plan');
       }
@@ -374,7 +535,7 @@ export const supabaseAuthService = {
         .from('users')
         .update({
           role: 'premium',
-          premiumUntil: premiumUntil.toISOString(),
+          premium_until: premiumUntil.toISOString(),
         })
         .eq('id', user.id)
         .select()
@@ -388,17 +549,13 @@ export const supabaseAuthService = {
       await supabase
         .from('payments')
         .insert({
-          userId: user.id,
-          amount: planId === 'monthly' 
-            ? plan.premiumMonthlyPrice 
-            : planId === 'quarterly' 
-              ? plan.premiumQuarterlyPrice 
-              : plan.premiumYearlyPrice,
+          user_id: user.id,
+          amount: amount,
           currency: plan.currency,
           method: paymentMethod,
           status: 'completed',
           description: `Premium subscription (${planId})`,
-          createdAt: new Date().toISOString(),
+          created_at: new Date().toISOString(),
         });
       
       const userData: User = {
@@ -408,8 +565,8 @@ export const supabaseAuthService = {
         phone: updatedProfile.phone,
         role: updatedProfile.role,
         verified: updatedProfile.verified,
-        premiumUntil: updatedProfile.premiumUntil,
-        createdAt: updatedProfile.createdAt,
+        premiumUntil: updatedProfile.premium_until,
+        createdAt: updatedProfile.created_at,
       };
       
       // Update stored user data
@@ -511,7 +668,57 @@ export const supabasePropertyService = {
   // Get all properties with optional filters
   getProperties: async (filter?: PropertyFilter): Promise<Property[]> => {
     try {
-      return await supabaseHelper.db.getProperties(filter);
+      let query = supabase.from('properties').select('*, images(*)');
+      
+      // Apply filters if provided
+      if (filter) {
+        if (filter.type) query = query.eq('type', filter.type);
+        if (filter.listingType) query = query.eq('listing_type', filter.listingType);
+        if (filter.province) query = query.eq('province', filter.province);
+        if (filter.city) query = query.eq('city', filter.city);
+        if (filter.minPrice) query = query.gte('price', filter.minPrice);
+        if (filter.maxPrice) query = query.lte('price', filter.maxPrice);
+        if (filter.minBedrooms) query = query.gte('bedrooms', filter.minBedrooms);
+        if (filter.minBathrooms) query = query.gte('bathrooms', filter.minBathrooms);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Transform data to match our Property type
+      return data.map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        price: item.price,
+        type: item.type,
+        listingType: item.listing_type,
+        bedrooms: item.bedrooms,
+        bathrooms: item.bathrooms,
+        area: item.area,
+        featured: item.featured,
+        boostedUntil: item.boosted_until,
+        views: item.views,
+        location: {
+          province: item.province,
+          city: item.city,
+          district: item.district,
+          address: item.address,
+          latitude: item.latitude,
+          longitude: item.longitude,
+        },
+        images: item.images ? item.images.map((img: any) => ({
+          id: img.id,
+          url: img.url,
+          order: img.order,
+        })) : [],
+        amenities: [], // We'll need to fetch these separately or join in the query
+        createdAt: item.created_at,
+        userId: item.user_id,
+      }));
     } catch (error: any) {
       throw new Error(error.message || 'Failed to get properties');
     }
@@ -520,7 +727,46 @@ export const supabasePropertyService = {
   // Get featured properties
   getFeaturedProperties: async (): Promise<Property[]> => {
     try {
-      return await supabaseHelper.db.getFeaturedProperties();
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*, images(*)')
+        .eq('featured', true);
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Transform data to match our Property type
+      return data.map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        price: item.price,
+        type: item.type,
+        listingType: item.listing_type,
+        bedrooms: item.bedrooms,
+        bathrooms: item.bathrooms,
+        area: item.area,
+        featured: item.featured,
+        boostedUntil: item.boosted_until,
+        views: item.views,
+        location: {
+          province: item.province,
+          city: item.city,
+          district: item.district,
+          address: item.address,
+          latitude: item.latitude,
+          longitude: item.longitude,
+        },
+        images: item.images ? item.images.map((img: any) => ({
+          id: img.id,
+          url: img.url,
+          order: img.order,
+        })) : [],
+        amenities: [], // We'll need to fetch these separately or join in the query
+        createdAt: item.created_at,
+        userId: item.user_id,
+      }));
     } catch (error: any) {
       throw new Error(error.message || 'Failed to get featured properties');
     }
@@ -535,7 +781,46 @@ export const supabasePropertyService = {
         throw new Error('User not authenticated');
       }
       
-      return await supabaseHelper.db.getUserProperties(user.id);
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*, images(*)')
+        .eq('user_id', user.id);
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Transform data to match our Property type
+      return data.map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        price: item.price,
+        type: item.type,
+        listingType: item.listing_type,
+        bedrooms: item.bedrooms,
+        bathrooms: item.bathrooms,
+        area: item.area,
+        featured: item.featured,
+        boostedUntil: item.boosted_until,
+        views: item.views,
+        location: {
+          province: item.province,
+          city: item.city,
+          district: item.district,
+          address: item.address,
+          latitude: item.latitude,
+          longitude: item.longitude,
+        },
+        images: item.images ? item.images.map((img: any) => ({
+          id: img.id,
+          url: img.url,
+          order: img.order,
+        })) : [],
+        amenities: [], // We'll need to fetch these separately or join in the query
+        createdAt: item.created_at,
+        userId: item.user_id,
+      }));
     } catch (error: any) {
       throw new Error(error.message || 'Failed to get user properties');
     }
@@ -544,7 +829,52 @@ export const supabasePropertyService = {
   // Get a single property by ID
   getProperty: async (id: string): Promise<Property> => {
     try {
-      return await supabaseHelper.db.getProperty(id);
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*, images(*), property_amenities(*)')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Get amenities
+      const amenities = data.property_amenities ? 
+        data.property_amenities.map((amenity: any) => amenity.name) : 
+        [];
+      
+      // Transform data to match our Property type
+      return {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        price: data.price,
+        type: data.type,
+        listingType: data.listing_type,
+        bedrooms: data.bedrooms,
+        bathrooms: data.bathrooms,
+        area: data.area,
+        featured: data.featured,
+        boostedUntil: data.boosted_until,
+        views: data.views,
+        location: {
+          province: data.province,
+          city: data.city,
+          district: data.district,
+          address: data.address,
+          latitude: data.latitude,
+          longitude: data.longitude,
+        },
+        images: data.images ? data.images.map((img: any) => ({
+          id: img.id,
+          url: img.url,
+          order: img.order,
+        })) : [],
+        amenities,
+        createdAt: data.created_at,
+        userId: data.user_id,
+      };
     } catch (error: any) {
       throw new Error(error.message || 'Property not found');
     }
@@ -560,51 +890,111 @@ export const supabasePropertyService = {
       }
       
       // Check if user is allowed to create more properties
-      if (propertyData.images && propertyData.images.length > 0) {
-        // Upload images first
-        const imagePromises = propertyData.images.map(async (image, index) => {
-          const path = `${user.id}/${Date.now()}-${index}`;
-          const data = await supabaseHelper.db.uploadPropertyImage(image.file, path);
-          return {
-            url: supabaseHelper.db.getImageUrl(data.path),
-            order: index,
-          };
-        });
-        
-        const uploadedImages = await Promise.all(imagePromises);
-        
-        // Create property without images first
-        const { images, ...propertyWithoutImages } = propertyData;
-        const newProperty = await supabaseHelper.db.createProperty({
-          ...propertyWithoutImages,
-          userId: user.id,
-          createdAt: new Date().toISOString(),
-          views: 0,
-        });
-        
-        // Then add images
-        for (const image of uploadedImages) {
-          await supabase
-            .from('property_images')
-            .insert({
-              propertyId: newProperty.id,
-              url: image.url,
-              order: image.order,
-              createdAt: new Date().toISOString(),
-            });
-        }
-        
-        // Get the complete property with images
-        return await supabaseHelper.db.getProperty(newProperty.id);
-      } else {
-        // Create property without images
-        return await supabaseHelper.db.createProperty({
-          ...propertyData,
-          userId: user.id,
-          createdAt: new Date().toISOString(),
-          views: 0,
-        });
+      const { data: userProperties, error: countError } = await supabase
+        .from('properties')
+        .select('id')
+        .eq('user_id', user.id);
+      
+      if (countError) {
+        throw countError;
       }
+      
+      // Get settings
+      const { data: settings, error: settingsError } = await supabase
+        .from('settings')
+        .select('max_properties_for_free_users')
+        .single();
+      
+      if (settingsError && settingsError.code !== 'PGRST116') {
+        throw settingsError;
+      }
+      
+      const maxProperties = settings?.max_properties_for_free_users || 3;
+      
+      // Check if user is premium or has not reached the limit
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role, premium_until')
+        .eq('id', user.id)
+        .single();
+      
+      if (userError) {
+        throw userError;
+      }
+      
+      const isPremium = userData.role === 'premium' && 
+        (userData.premium_until ? new Date(userData.premium_until) > new Date() : false);
+      
+      if (!isPremium && userProperties.length >= maxProperties) {
+        throw new Error(`Free users can only create ${maxProperties} properties. Upgrade to premium for unlimited properties.`);
+      }
+      
+      // Prepare property data for Supabase
+      const { location, images, amenities, ...rest } = propertyData;
+      
+      const dbPropertyData = {
+        ...rest,
+        province: location.province,
+        city: location.city,
+        district: location.district,
+        address: location.address,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+        views: 0,
+        listing_type: propertyData.listingType,
+      };
+      
+      // Create property
+      const { data: newProperty, error: propertyError } = await supabase
+        .from('properties')
+        .insert(dbPropertyData)
+        .select()
+        .single();
+      
+      if (propertyError) {
+        throw propertyError;
+      }
+      
+      // Add amenities if any
+      if (amenities && amenities.length > 0) {
+        const amenityData = amenities.map(name => ({
+          name,
+          property_id: newProperty.id,
+        }));
+        
+        const { error: amenitiesError } = await supabase
+          .from('property_amenities')
+          .insert(amenityData);
+        
+        if (amenitiesError) {
+          throw amenitiesError;
+        }
+      }
+      
+      // Add images if any
+      if (images && images.length > 0) {
+        // In a real app, you would upload the images to storage first
+        // For now, we'll just use the URLs directly
+        const imageData = images.map((image, index) => ({
+          url: image.url,
+          order: index,
+          property_id: newProperty.id,
+          created_at: new Date().toISOString(),
+        }));
+        
+        const { error: imagesError } = await supabase
+          .from('property_images')
+          .insert(imageData);
+        
+        if (imagesError) {
+          throw imagesError;
+        }
+      }
+      
+      // Get the complete property with images and amenities
+      return await this.getProperty(newProperty.id);
     } catch (error: any) {
       throw new Error(error.message || 'Failed to create property');
     }
@@ -622,70 +1012,115 @@ export const supabasePropertyService = {
       // Check if property belongs to user
       const { data: property, error: propertyError } = await supabase
         .from('properties')
-        .select('userId')
+        .select('user_id')
         .eq('id', id)
         .single();
-        
+      
       if (propertyError) {
         throw propertyError;
       }
       
-      if (property.userId !== user.id) {
+      if (property.user_id !== user.id) {
         throw new Error('You do not have permission to update this property');
       }
       
-      // Handle image updates if any
-      if (updates.images && updates.images.length > 0) {
-        // Delete existing images
-        await supabase
-          .from('property_images')
+      // Prepare updates for Supabase
+      const dbUpdates: any = {};
+      
+      // Copy simple fields
+      if (updates.title !== undefined) dbUpdates.title = updates.title;
+      if (updates.description !== undefined) dbUpdates.description = updates.description;
+      if (updates.price !== undefined) dbUpdates.price = updates.price;
+      if (updates.type !== undefined) dbUpdates.type = updates.type;
+      if (updates.listingType !== undefined) dbUpdates.listing_type = updates.listingType;
+      if (updates.bedrooms !== undefined) dbUpdates.bedrooms = updates.bedrooms;
+      if (updates.bathrooms !== undefined) dbUpdates.bathrooms = updates.bathrooms;
+      if (updates.area !== undefined) dbUpdates.area = updates.area;
+      if (updates.featured !== undefined) dbUpdates.featured = updates.featured;
+      if (updates.boostedUntil !== undefined) dbUpdates.boosted_until = updates.boostedUntil;
+      
+      // Handle location updates
+      if (updates.location) {
+        if (updates.location.province !== undefined) dbUpdates.province = updates.location.province;
+        if (updates.location.city !== undefined) dbUpdates.city = updates.location.city;
+        if (updates.location.district !== undefined) dbUpdates.district = updates.location.district;
+        if (updates.location.address !== undefined) dbUpdates.address = updates.location.address;
+        if (updates.location.latitude !== undefined) dbUpdates.latitude = updates.location.latitude;
+        if (updates.location.longitude !== undefined) dbUpdates.longitude = updates.location.longitude;
+      }
+      
+      // Update property
+      const { error: updateError } = await supabase
+        .from('properties')
+        .update(dbUpdates)
+        .eq('id', id);
+      
+      if (updateError) {
+        throw updateError;
+      }
+      
+      // Handle amenities updates
+      if (updates.amenities) {
+        // Delete existing amenities
+        const { error: deleteAmenitiesError } = await supabase
+          .from('property_amenities')
           .delete()
-          .eq('propertyId', id);
+          .eq('property_id', id);
         
-        // Upload new images
-        const imagePromises = updates.images.map(async (image, index) => {
-          if (image.file) {
-            const path = `${user.id}/${Date.now()}-${index}`;
-            const data = await supabaseHelper.db.uploadPropertyImage(image.file, path);
-            return {
-              url: supabaseHelper.db.getImageUrl(data.path),
-              order: index,
-            };
-          } else {
-            // Image already exists
-            return {
-              url: image.url,
-              order: index,
-            };
-          }
-        });
-        
-        const uploadedImages = await Promise.all(imagePromises);
-        
-        // Add new images
-        for (const image of uploadedImages) {
-          await supabase
-            .from('property_images')
-            .insert({
-              propertyId: id,
-              url: image.url,
-              order: image.order,
-              createdAt: new Date().toISOString(),
-            });
+        if (deleteAmenitiesError) {
+          throw deleteAmenitiesError;
         }
         
-        // Remove images from updates
-        const { images, ...updatesWithoutImages } = updates;
+        // Add new amenities
+        if (updates.amenities.length > 0) {
+          const amenityData = updates.amenities.map(name => ({
+            name,
+            property_id: id,
+          }));
+          
+          const { error: amenitiesError } = await supabase
+            .from('property_amenities')
+            .insert(amenityData);
+          
+          if (amenitiesError) {
+            throw amenitiesError;
+          }
+        }
+      }
+      
+      // Handle images updates
+      if (updates.images) {
+        // Delete existing images
+        const { error: deleteImagesError } = await supabase
+          .from('property_images')
+          .delete()
+          .eq('property_id', id);
         
-        // Update property
-        await supabaseHelper.db.updateProperty(id, updatesWithoutImages);
-      } else {
-        // Update property without changing images
-        await supabaseHelper.db.updateProperty(id, updates);
+        if (deleteImagesError) {
+          throw deleteImagesError;
+        }
+        
+        // Add new images
+        if (updates.images.length > 0) {
+          const imageData = updates.images.map((image, index) => ({
+            url: image.url,
+            order: index,
+            property_id: id,
+            created_at: new Date().toISOString(),
+          }));
+          
+          const { error: imagesError } = await supabase
+            .from('property_images')
+            .insert(imageData);
+          
+          if (imagesError) {
+            throw imagesError;
+          }
+        }
       }
       
       // Get the updated property
-      return await supabaseHelper.db.getProperty(id);
+      return await this.getProperty(id);
     } catch (error: any) {
       throw new Error(error.message || 'Failed to update property');
     }
@@ -703,20 +1138,29 @@ export const supabasePropertyService = {
       // Check if property belongs to user
       const { data: property, error: propertyError } = await supabase
         .from('properties')
-        .select('userId')
+        .select('user_id')
         .eq('id', id)
         .single();
-        
+      
       if (propertyError) {
         throw propertyError;
       }
       
-      if (property.userId !== user.id) {
+      if (property.user_id !== user.id) {
         throw new Error('You do not have permission to delete this property');
       }
       
-      // Delete property (cascade will delete images)
-      return await supabaseHelper.db.deleteProperty(id);
+      // Delete property (cascade will delete images and amenities)
+      const { error: deleteError } = await supabase
+        .from('properties')
+        .delete()
+        .eq('id', id);
+      
+      if (deleteError) {
+        throw deleteError;
+      }
+      
+      return true;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to delete property');
     }
@@ -734,15 +1178,15 @@ export const supabasePropertyService = {
       // Check if property belongs to user
       const { data: property, error: propertyError } = await supabase
         .from('properties')
-        .select('userId')
+        .select('user_id')
         .eq('id', propertyId)
         .single();
-        
+      
       if (propertyError) {
         throw propertyError;
       }
       
-      if (property.userId !== user.id) {
+      if (property.user_id !== user.id) {
         throw new Error('You do not have permission to upload images to this property');
       }
       
@@ -750,25 +1194,41 @@ export const supabasePropertyService = {
       const imageFiles = images.getAll('images');
       
       // Upload images
-      const imagePromises = Array.from(imageFiles).map(async (file: any, index) => {
-        const path = `${user.id}/${propertyId}/${Date.now()}-${index}`;
-        const data = await supabaseHelper.db.uploadPropertyImage(file, path);
-        const url = supabaseHelper.db.getImageUrl(data.path);
+      const imageUrls: string[] = [];
+      
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i] as any;
+        const path = `${user.id}/${propertyId}/${Date.now()}-${i}`;
+        
+        // Upload to Supabase Storage
+        const { data, error } = await supabase.storage
+          .from('property-images')
+          .upload(path, file);
+        
+        if (error) {
+          throw error;
+        }
+        
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('property-images')
+          .getPublicUrl(data.path);
+        
+        const url = urlData.publicUrl;
+        imageUrls.push(url);
         
         // Add image to property_images table
         await supabase
           .from('property_images')
           .insert({
-            propertyId,
+            property_id: propertyId,
             url,
-            order: index,
-            createdAt: new Date().toISOString(),
+            order: i,
+            created_at: new Date().toISOString(),
           });
-        
-        return url;
-      });
+      }
       
-      return await Promise.all(imagePromises);
+      return imageUrls;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to upload images');
     }
@@ -783,7 +1243,7 @@ export const supabasePropertyService = {
         .select('views')
         .eq('id', propertyId)
         .single();
-        
+      
       if (propertyError) {
         throw propertyError;
       }
@@ -792,8 +1252,8 @@ export const supabasePropertyService = {
       const { count: favoritesCount, error: favoritesError } = await supabase
         .from('favorites')
         .select('*', { count: 'exact', head: true })
-        .eq('propertyId', propertyId);
-        
+        .eq('property_id', propertyId);
+      
       if (favoritesError) {
         throw favoritesError;
       }
@@ -802,16 +1262,16 @@ export const supabasePropertyService = {
       const { count: contactsCount, error: contactsError } = await supabase
         .from('messages')
         .select('*', { count: 'exact', head: true })
-        .eq('propertyId', propertyId);
-        
-      if (contactsError) {
+        .eq('property_id', propertyId);
+      
+      if (contactsError && contactsError.code !== 'PGRST116') {
         throw contactsError;
       }
       
       return {
         views: property.views,
-        contacts: contactsCount,
-        favorites: favoritesCount,
+        contacts: contactsCount || 0,
+        favorites: favoritesCount || 0,
         lastViewedAt: new Date().toISOString(),
       };
     } catch (error: any) {
@@ -826,12 +1286,42 @@ export const supabasePropertyService = {
         .from('properties')
         .select('*, images(*)')
         .or(`title.ilike.%${query}%,description.ilike.%${query}%`);
-        
+      
       if (error) {
         throw error;
       }
       
-      return data;
+      // Transform data to match our Property type
+      return data.map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        price: item.price,
+        type: item.type,
+        listingType: item.listing_type,
+        bedrooms: item.bedrooms,
+        bathrooms: item.bathrooms,
+        area: item.area,
+        featured: item.featured,
+        boostedUntil: item.boosted_until,
+        views: item.views,
+        location: {
+          province: item.province,
+          city: item.city,
+          district: item.district,
+          address: item.address,
+          latitude: item.latitude,
+          longitude: item.longitude,
+        },
+        images: item.images ? item.images.map((img: any) => ({
+          id: img.id,
+          url: img.url,
+          order: img.order,
+        })) : [],
+        amenities: [], // We'll need to fetch these separately or join in the query
+        createdAt: item.created_at,
+        userId: item.user_id,
+      }));
     } catch (error: any) {
       throw new Error(error.message || 'Search failed');
     }
@@ -846,7 +1336,23 @@ export const supabasePropertyService = {
         throw new Error('User not authenticated');
       }
       
-      return await supabaseHelper.db.addToFavorites(user.id, propertyId);
+      const { error } = await supabase
+        .from('favorites')
+        .insert({
+          user_id: user.id,
+          property_id: propertyId,
+          created_at: new Date().toISOString(),
+        });
+      
+      if (error) {
+        // If already favorited, just return success
+        if (error.code === '23505') {
+          return true;
+        }
+        throw error;
+      }
+      
+      return true;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to add to favorites');
     }
@@ -861,7 +1367,16 @@ export const supabasePropertyService = {
         throw new Error('User not authenticated');
       }
       
-      return await supabaseHelper.db.removeFromFavorites(user.id, propertyId);
+      const { error } = await supabase
+        .from('favorites')
+        .delete()
+        .match({ user_id: user.id, property_id: propertyId });
+      
+      if (error) {
+        throw error;
+      }
+      
+      return true;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to remove from favorites');
     }
@@ -876,7 +1391,45 @@ export const supabasePropertyService = {
         throw new Error('User not authenticated');
       }
       
-      return await supabaseHelper.db.getFavorites(user.id);
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('property:property_id(*)')
+        .eq('user_id', user.id);
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Transform data to match our Property type
+      return data.map((fav: any) => {
+        const item = fav.property;
+        return {
+          id: item.id,
+          title: item.title,
+          description: item.description,
+          price: item.price,
+          type: item.type,
+          listingType: item.listing_type,
+          bedrooms: item.bedrooms,
+          bathrooms: item.bathrooms,
+          area: item.area,
+          featured: item.featured,
+          boostedUntil: item.boosted_until,
+          views: item.views,
+          location: {
+            province: item.province,
+            city: item.city,
+            district: item.district,
+            address: item.address,
+            latitude: item.latitude,
+            longitude: item.longitude,
+          },
+          images: [], // We'll need to fetch these separately or join in the query
+          amenities: [], // We'll need to fetch these separately or join in the query
+          createdAt: item.created_at,
+          userId: item.user_id,
+        };
+      });
     } catch (error: any) {
       throw new Error(error.message || 'Failed to get favorites');
     }
@@ -894,15 +1447,15 @@ export const supabasePropertyService = {
       // Check if property belongs to user
       const { data: property, error: propertyError } = await supabase
         .from('properties')
-        .select('userId')
+        .select('user_id')
         .eq('id', propertyId)
         .single();
-        
+      
       if (propertyError) {
         throw propertyError;
       }
       
-      if (property.userId !== user.id) {
+      if (property.user_id !== user.id) {
         throw new Error('You do not have permission to boost this property');
       }
       
@@ -911,10 +1464,18 @@ export const supabasePropertyService = {
         .from('settings')
         .select('*')
         .single();
-        
-      if (settingsError) {
+      
+      if (settingsError && settingsError.code !== 'PGRST116') {
         throw settingsError;
       }
+      
+      // Use default settings if none exist
+      const boostSettings = settings || {
+        boost_7days_price: 500,
+        boost_15days_price: 900,
+        boost_30days_price: 1600,
+        currency: 'MZN',
+      };
       
       // Calculate boost expiration date
       const boostedUntil = new Date();
@@ -922,13 +1483,13 @@ export const supabasePropertyService = {
       
       if (boostOptionId === '7days') {
         boostedUntil.setDate(boostedUntil.getDate() + 7);
-        boostPrice = settings.boost7DaysPrice;
+        boostPrice = boostSettings.boost_7days_price;
       } else if (boostOptionId === '15days') {
         boostedUntil.setDate(boostedUntil.getDate() + 15);
-        boostPrice = settings.boost15DaysPrice;
+        boostPrice = boostSettings.boost_15days_price;
       } else if (boostOptionId === '30days') {
         boostedUntil.setDate(boostedUntil.getDate() + 30);
-        boostPrice = settings.boost30DaysPrice;
+        boostPrice = boostSettings.boost_30days_price;
       } else {
         throw new Error('Invalid boost option');
       }
@@ -938,10 +1499,10 @@ export const supabasePropertyService = {
         .from('properties')
         .update({
           featured: true,
-          boostedUntil: boostedUntil.toISOString(),
+          boosted_until: boostedUntil.toISOString(),
         })
         .eq('id', propertyId);
-        
+      
       if (updateError) {
         throw updateError;
       }
@@ -950,13 +1511,13 @@ export const supabasePropertyService = {
       await supabase
         .from('payments')
         .insert({
-          userId: user.id,
+          user_id: user.id,
           amount: boostPrice,
-          currency: settings.currency,
+          currency: boostSettings.currency,
           method: paymentMethod,
           status: 'completed',
           description: `Property boost (${boostOptionId})`,
-          createdAt: new Date().toISOString(),
+          created_at: new Date().toISOString(),
         });
       
       return {

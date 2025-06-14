@@ -135,12 +135,20 @@ export const handleApiError = (error: any): string => {
   return error.message || 'Ocorreu um erro. Tente novamente.';
 };
 
-// Function to check if we should use Supabase, tRPC or fallback to mock data
+// Function to check if we should use Supabase
 export const shouldUseSupabase = async (): Promise<boolean> => {
   try {
     // Check if Supabase is configured
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return false;
+    }
+    
+    // Try to make a simple query to check if Supabase is available
     const { data } = await supabase.from('settings').select('*').limit(1);
-    return !!data;
+    return true;
   } catch (error) {
     console.log('Supabase not available:', error);
     return false;

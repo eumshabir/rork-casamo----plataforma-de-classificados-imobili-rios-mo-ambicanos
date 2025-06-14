@@ -1,6 +1,6 @@
 # CasaMoc - Real Estate App
 
-CasaMoc is a real estate marketplace app for Mozambique, allowing users to list, search, and contact property owners.
+CasaMoc is a real estate application for Mozambique, allowing users to list, search, and manage properties.
 
 ## Features
 
@@ -8,7 +8,7 @@ CasaMoc is a real estate marketplace app for Mozambique, allowing users to list,
 - Property listings with images and details
 - Search and filter properties
 - Premium user subscriptions
-- Property boost/featured listings
+- Property boosting
 - Favorites and messaging
 - M-Pesa and e-Mola payment integration
 
@@ -16,292 +16,89 @@ CasaMoc is a real estate marketplace app for Mozambique, allowing users to list,
 
 ### Prerequisites
 
-- Node.js 16+
+- Node.js (v16+)
 - Expo CLI
 - Supabase account
 
 ### Environment Setup
 
-1. Copy `.env.example` to `.env` and fill in your Supabase credentials:
+1. Clone the repository
+2. Copy `.env.example` to `.env` and update with your credentials:
 
 ```
-EXPO_PUBLIC_SUPABASE_URL="https://your-project-id.supabase.co"
+# Supabase credentials
+EXPO_PUBLIC_SUPABASE_URL="your-supabase-url"
 EXPO_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
+
+# M-Pesa API credentials (for production)
+MPESA_API_KEY="your-mpesa-api-key"
+MPESA_API_SECRET="your-mpesa-api-secret"
+MPESA_SERVICE_PROVIDER_CODE="your-service-provider-code"
+
+# e-Mola API credentials (for production)
+EMOLA_API_KEY="your-emola-api-key"
+EMOLA_API_SECRET="your-emola-api-secret"
+EMOLA_MERCHANT_ID="your-merchant-id"
 ```
 
 ### Supabase Setup
 
 1. Create a new Supabase project
-2. Run the following SQL in the Supabase SQL editor to create the necessary tables:
-
-```sql
--- Create users table
-CREATE TABLE users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id),
-  name TEXT NOT NULL,
-  email TEXT UNIQUE,
-  phone TEXT UNIQUE,
-  role TEXT DEFAULT 'user',
-  verified BOOLEAN DEFAULT false,
-  premium_until TIMESTAMP,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Create properties table
-CREATE TABLE properties (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title TEXT NOT NULL,
-  description TEXT NOT NULL,
-  price DECIMAL NOT NULL,
-  type TEXT NOT NULL,
-  listing_type TEXT NOT NULL,
-  bedrooms INTEGER,
-  bathrooms INTEGER,
-  area DECIMAL,
-  featured BOOLEAN DEFAULT false,
-  boosted_until TIMESTAMP,
-  views INTEGER DEFAULT 0,
-  province TEXT NOT NULL,
-  city TEXT NOT NULL,
-  district TEXT,
-  address TEXT,
-  latitude DECIMAL,
-  longitude DECIMAL,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Create property_images table
-CREATE TABLE property_images (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  url TEXT NOT NULL,
-  "order" INTEGER DEFAULT 0,
-  property_id UUID REFERENCES properties(id) ON DELETE CASCADE,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Create property_amenities table
-CREATE TABLE property_amenities (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT NOT NULL,
-  property_id UUID REFERENCES properties(id) ON DELETE CASCADE
-);
-
--- Create favorites table
-CREATE TABLE favorites (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  property_id UUID REFERENCES properties(id) ON DELETE CASCADE,
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(user_id, property_id)
-);
-
--- Create conversations table
-CREATE TABLE conversations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Create conversation_participants table
-CREATE TABLE conversation_participants (
-  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  PRIMARY KEY (conversation_id, user_id)
-);
-
--- Create messages table
-CREATE TABLE messages (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  content TEXT NOT NULL,
-  read BOOLEAN DEFAULT false,
-  sender_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  receiver_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Create notifications table
-CREATE TABLE notifications (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title TEXT NOT NULL,
-  body TEXT NOT NULL,
-  data JSONB,
-  read BOOLEAN DEFAULT false,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Create payments table
-CREATE TABLE payments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  amount DECIMAL NOT NULL,
-  currency TEXT NOT NULL,
-  method TEXT NOT NULL,
-  status TEXT NOT NULL,
-  description TEXT NOT NULL,
-  reference TEXT,
-  transaction_id TEXT,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Create devices table
-CREATE TABLE devices (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  token TEXT UNIQUE NOT NULL,
-  platform TEXT NOT NULL,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Create settings table
-CREATE TABLE settings (
-  id TEXT PRIMARY KEY DEFAULT 'settings',
-  premium_monthly_price DECIMAL DEFAULT 1500,
-  premium_quarterly_price DECIMAL DEFAULT 4000,
-  premium_yearly_price DECIMAL DEFAULT 15000,
-  boost_7days_price DECIMAL DEFAULT 500,
-  boost_15days_price DECIMAL DEFAULT 900,
-  boost_30days_price DECIMAL DEFAULT 1600,
-  currency TEXT DEFAULT 'MZN',
-  max_images_per_property INTEGER DEFAULT 10,
-  max_properties_for_free_users INTEGER DEFAULT 3
-);
-
--- Insert default settings
-INSERT INTO settings (id) VALUES ('settings');
-
--- Create storage buckets
-INSERT INTO storage.buckets (id, name) VALUES ('property-images', 'Property Images');
-
--- Set up storage policies
-CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'property-images');
-CREATE POLICY "Authenticated users can upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'property-images' AND auth.role() = 'authenticated');
-CREATE POLICY "Users can update own objects" ON storage.objects FOR UPDATE USING (bucket_id = 'property-images' AND auth.uid() = owner);
-CREATE POLICY "Users can delete own objects" ON storage.objects FOR DELETE USING (bucket_id = 'property-images' AND auth.uid() = owner);
-
--- Set up RLS policies
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE properties ENABLE ROW LEVEL SECURITY;
-ALTER TABLE property_images ENABLE ROW LEVEL SECURITY;
-ALTER TABLE property_amenities ENABLE ROW LEVEL SECURITY;
-ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
-ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE conversation_participants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE devices ENABLE ROW LEVEL SECURITY;
-
--- User policies
-CREATE POLICY "Users can read their own data" ON users FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update their own data" ON users FOR UPDATE USING (auth.uid() = id);
-
--- Property policies
-CREATE POLICY "Anyone can read properties" ON properties FOR SELECT USING (true);
-CREATE POLICY "Users can create properties" ON properties FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update their own properties" ON properties FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete their own properties" ON properties FOR DELETE USING (auth.uid() = user_id);
-
--- Property images policies
-CREATE POLICY "Anyone can read property images" ON property_images FOR SELECT USING (true);
-CREATE POLICY "Users can create property images" ON property_images FOR INSERT WITH CHECK (
-  auth.uid() IN (SELECT user_id FROM properties WHERE id = property_id)
-);
-CREATE POLICY "Users can update their own property images" ON property_images FOR UPDATE USING (
-  auth.uid() IN (SELECT user_id FROM properties WHERE id = property_id)
-);
-CREATE POLICY "Users can delete their own property images" ON property_images FOR DELETE USING (
-  auth.uid() IN (SELECT user_id FROM properties WHERE id = property_id)
-);
-
--- Favorites policies
-CREATE POLICY "Users can read their own favorites" ON favorites FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can create favorites" ON favorites FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can delete their own favorites" ON favorites FOR DELETE USING (auth.uid() = user_id);
-
--- Create functions and triggers
-CREATE OR REPLACE FUNCTION update_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER update_properties_updated_at
-BEFORE UPDATE ON properties
-FOR EACH ROW
-EXECUTE FUNCTION update_updated_at();
-
-CREATE TRIGGER update_conversations_updated_at
-BEFORE UPDATE ON conversations
-FOR EACH ROW
-EXECUTE FUNCTION update_updated_at();
-```
-
-3. Set up authentication providers in Supabase:
-   - Email/password (default)
-   - Google OAuth
-   - Facebook OAuth
+2. Go to SQL Editor in your Supabase dashboard
+3. Run the SQL script from `sql/supabase-setup.sql` to create all necessary tables and policies
+4. Create a storage bucket named `property-images` for property images
 
 ### Installation
 
-1. Clone the repository
-2. Install dependencies:
-
 ```bash
+# Install dependencies
 npm install
-```
 
-3. Start the development server:
-
-```bash
+# Start the development server
 npm start
 ```
 
-## Deployment
-
-### Expo Build
-
-To create a production build:
+### Building for Production
 
 ```bash
-eas build --platform android
-eas build --platform ios
+# Build for Android
+eas build -p android
+
+# Build for iOS
+eas build -p ios
 ```
 
-### Backend Deployment
+## Project Structure
 
-The app uses Supabase as the backend, which is already deployed in the cloud. No additional backend deployment is needed.
+- `/app` - Expo Router screens
+- `/components` - Reusable UI components
+- `/constants` - App constants
+- `/hooks` - Custom React hooks
+- `/lib` - Utility libraries
+- `/mocks` - Mock data (used as fallback)
+- `/services` - API services
+- `/store` - State management with Zustand
+- `/types` - TypeScript type definitions
 
-## M-Pesa Integration
+## Authentication
 
-To integrate M-Pesa payments:
+The app supports multiple authentication methods:
 
-1. Register for an M-Pesa API account
-2. Add your API credentials to the .env file:
+- Email and password
+- Google OAuth
+- Facebook OAuth
+- Phone number verification
 
-```
-MPESA_API_KEY="your-mpesa-api-key"
-MPESA_API_SECRET="your-mpesa-api-secret"
-MPESA_SERVICE_PROVIDER_CODE="your-service-provider-code"
-```
+## Data Storage
 
-## e-Mola Integration
+All data is stored in Supabase with proper row-level security policies. The app falls back to mock data if Supabase is not available.
 
-To integrate e-Mola payments:
+## Payment Integration
 
-1. Register for an e-Mola merchant account
-2. Add your API credentials to the .env file:
+The app integrates with:
 
-```
-EMOLA_API_KEY="your-emola-api-key"
-EMOLA_API_SECRET="your-emola-api-secret"
-EMOLA_MERCHANT_ID="your-merchant-id"
-```
+- M-Pesa for mobile payments
+- e-Mola as an alternative payment method
 
 ## License
 

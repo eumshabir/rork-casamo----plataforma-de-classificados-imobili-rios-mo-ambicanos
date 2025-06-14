@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
 
-// Initialize Supabase client
+// Initialize Supabase client with real credentials
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
 
@@ -79,7 +79,7 @@ export const supabaseHelper = {
       // Apply filters if provided
       if (filters) {
         if (filters.type) query = query.eq('type', filters.type);
-        if (filters.listingType) query = query.eq('listingType', filters.listingType);
+        if (filters.listingType) query = query.eq('listing_type', filters.listingType);
         if (filters.province) query = query.eq('province', filters.province);
         if (filters.city) query = query.eq('city', filters.city);
         if (filters.minPrice) query = query.gte('price', filters.minPrice);
@@ -106,7 +106,7 @@ export const supabaseHelper = {
       const { data, error } = await supabase
         .from('properties')
         .select('*, images(*)')
-        .eq('userId', userId);
+        .eq('user_id', userId);
       if (error) throw error;
       return data;
     },
@@ -114,7 +114,7 @@ export const supabaseHelper = {
     getProperty: async (id: string) => {
       const { data, error } = await supabase
         .from('properties')
-        .select('*, images(*), amenities(*)')
+        .select('*, images(*), property_amenities(*)')
         .eq('id', id)
         .single();
       if (error) throw error;
@@ -155,7 +155,7 @@ export const supabaseHelper = {
     addToFavorites: async (userId: string, propertyId: string) => {
       const { error } = await supabase
         .from('favorites')
-        .insert({ userId, propertyId });
+        .insert({ user_id: userId, property_id: propertyId });
       if (error) throw error;
       return { success: true };
     },
@@ -164,7 +164,7 @@ export const supabaseHelper = {
       const { error } = await supabase
         .from('favorites')
         .delete()
-        .match({ userId, propertyId });
+        .match({ user_id: userId, property_id: propertyId });
       if (error) throw error;
       return { success: true };
     },
@@ -172,8 +172,8 @@ export const supabaseHelper = {
     getFavorites: async (userId: string) => {
       const { data, error } = await supabase
         .from('favorites')
-        .select('property:propertyId(*)')
-        .eq('userId', userId);
+        .select('property:property_id(*)')
+        .eq('user_id', userId);
       if (error) throw error;
       return data.map((fav: any) => fav.property);
     },

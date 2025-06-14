@@ -82,6 +82,7 @@ CREATE TABLE messages (
   sender_id UUID REFERENCES users(id) ON DELETE CASCADE,
   receiver_id UUID REFERENCES users(id) ON DELETE CASCADE,
   conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+  property_id UUID REFERENCES properties(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
