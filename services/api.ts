@@ -141,7 +141,7 @@ export const shouldUseTRPC = async (): Promise<boolean> => {
     await trpcClient.auth.me.query();
     return true;
   } catch (error) {
-    // If the request fails, use mock data
+    console.log('tRPC backend not available, falling back to mock data');
     return false;
   }
 };
