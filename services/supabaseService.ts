@@ -151,7 +151,7 @@ export const supabaseAuthService = {
   loginWithGoogle: async (): Promise<{ user: User; token: string }> => {
     try {
       // Start OAuth flow
-      await supabaseHelper.auth.signInWithOAuth('google');
+      const { data } = await supabaseHelper.auth.signInWithOAuth('google');
       
       // In a real app, we would handle the OAuth redirect and callback
       // For now, we'll simulate a successful login
@@ -185,7 +185,7 @@ export const supabaseAuthService = {
   loginWithFacebook: async (): Promise<{ user: User; token: string }> => {
     try {
       // Start OAuth flow
-      await supabaseHelper.auth.signInWithOAuth('facebook');
+      const { data } = await supabaseHelper.auth.signInWithOAuth('facebook');
       
       // In a real app, we would handle the OAuth redirect and callback
       // For now, we'll simulate a successful login
@@ -417,13 +417,13 @@ export const supabaseAuthService = {
       
       if (planId === 'monthly') {
         premiumUntil.setMonth(premiumUntil.getMonth() + 1);
-        amount = plan.premium_monthly_price;
+        amount = plan.premium_monthly_price || 1500;
       } else if (planId === 'quarterly') {
         premiumUntil.setMonth(premiumUntil.getMonth() + 3);
-        amount = plan.premium_quarterly_price;
+        amount = plan.premium_quarterly_price || 4000;
       } else if (planId === 'yearly') {
         premiumUntil.setFullYear(premiumUntil.getFullYear() + 1);
-        amount = plan.premium_yearly_price;
+        amount = plan.premium_yearly_price || 15000;
       } else {
         throw new Error('Invalid plan');
       }
@@ -449,7 +449,7 @@ export const supabaseAuthService = {
         .insert({
           user_id: user.id,
           amount: amount,
-          currency: plan.currency,
+          currency: plan.currency || 'MZN',
           method: paymentMethod,
           status: 'completed',
           description: `Premium subscription (${planId})`,
@@ -1249,7 +1249,7 @@ export const supabasePropertyService = {
       }
       
       return {
-        views: property.views,
+        views: property.views || 0,
         contacts: contactsCount || 0,
         favorites: favoritesCount || 0,
         lastViewedAt: new Date().toISOString(),
@@ -1469,17 +1469,16 @@ export const supabasePropertyService = {
         .select('*')
         .single();
       
-      if (settingsError && settingsError.code !== 'PGRST116') {
-        throw settingsError;
-      }
-      
-      // Use default settings if none exist
-      const boostSettings = settings || {
+      let boostSettings = {
         boost_7days_price: 500,
         boost_15days_price: 900,
         boost_30days_price: 1600,
         currency: 'MZN',
       };
+      
+      if (!settingsError && settings) {
+        boostSettings = settings;
+      }
       
       // Calculate boost expiration date
       const boostedUntil = new Date();

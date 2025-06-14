@@ -1,4 +1,4 @@
-import { Property, PropertyFilter } from '@/types/property';
+import { Property, PropertyFilter, Amenity } from '@/types/property';
 import { handleApiError, shouldUseTRPC, shouldUseSupabase } from './api';
 import { mockProperties } from '@/mocks/properties';
 import { trpcClient } from '@/lib/trpc';
@@ -58,7 +58,7 @@ export const propertyService = {
       
       if (filter?.amenities && filter.amenities.length > 0) {
         filteredProperties = filteredProperties.filter(p => 
-          filter.amenities?.every(amenity => p.amenities.includes(amenity))
+          filter.amenities?.every((amenity: Amenity) => p.amenities.includes(amenity))
         );
       }
       

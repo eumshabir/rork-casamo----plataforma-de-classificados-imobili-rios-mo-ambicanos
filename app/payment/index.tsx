@@ -18,7 +18,7 @@ import Input from '@/components/Input';
 import Button from '@/components/Button';
 import Colors from '@/constants/colors';
 import { paymentService, PAYMENT_METHODS, PAYMENT_ACCOUNTS } from '@/services/paymentService';
-import * as Clipboard from 'expo-clipboard';
+import * as Clipboard from 'expo-clipboard/build/Clipboard';
 
 export default function PaymentScreen() {
   const router = useRouter();
@@ -74,7 +74,7 @@ export default function PaymentScreen() {
   
   const handleCopyNumber = async () => {
     const accountInfo = PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS];
-    if (typeof accountInfo === 'object' && 'number' in accountInfo) {
+    if (accountInfo && typeof accountInfo === 'object' && 'number' in accountInfo) {
       await Clipboard.setStringAsync(accountInfo.number);
       Alert.alert('Copiado', 'Número copiado para a área de transferência');
     }
@@ -146,6 +146,15 @@ export default function PaymentScreen() {
     } finally {
       setIsProcessing(false);
     }
+  };
+  
+  // Helper function to safely get account info
+  const getAccountInfo = (method: string, property: 'number' | 'name'): string => {
+    const accountInfo = PAYMENT_ACCOUNTS[method as keyof typeof PAYMENT_ACCOUNTS];
+    if (accountInfo && typeof accountInfo === 'object' && property in accountInfo) {
+      return (accountInfo as any)[property];
+    }
+    return '';
   };
   
   return (
@@ -220,9 +229,7 @@ export default function PaymentScreen() {
                 <Text style={styles.accountLabel}>Número:</Text>
                 <View style={styles.accountValueContainer}>
                   <Text style={styles.accountValue}>
-                    {typeof PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS] === 'object' && 
-                     'number' in PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS] ? 
-                     (PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS] as {number: string}).number : ''}
+                    {getAccountInfo(selectedMethod, 'number')}
                   </Text>
                   <TouchableOpacity onPress={handleCopyNumber}>
                     <Copy size={20} color={Colors.primary} />
@@ -232,9 +239,7 @@ export default function PaymentScreen() {
               <View style={styles.accountInfo}>
                 <Text style={styles.accountLabel}>Nome:</Text>
                 <Text style={styles.accountValue}>
-                  {typeof PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS] === 'object' && 
-                   'name' in PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS] ? 
-                   (PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS] as {name: string}).name : ''}
+                  {getAccountInfo(selectedMethod, 'name')}
                 </Text>
               </View>
               <View style={styles.accountInfo}>

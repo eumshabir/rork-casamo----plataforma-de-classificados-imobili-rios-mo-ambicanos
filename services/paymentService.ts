@@ -171,7 +171,7 @@ export const paymentService = {
     try {
       // Try to use Supabase first
       if (await shouldUseSupabase()) {
-        return await supabaseAuthService.boostProperty(propertyId, boostOptionId, paymentMethod, phoneNumber);
+        return await supabasePropertyService.boostProperty(propertyId, boostOptionId, paymentMethod, phoneNumber);
       }
       
       // Try to use tRPC if Supabase is not available

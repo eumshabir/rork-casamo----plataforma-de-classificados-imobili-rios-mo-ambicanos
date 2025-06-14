@@ -44,3 +44,15 @@ export interface Property {
   views: number;
   userId?: string;
 }
+
+export interface PropertyFilter {
+  type?: PropertyType;
+  listingType?: ListingType;
+  province?: string;
+  city?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minBedrooms?: number;
+  minBathrooms?: number;
+  amenities?: Amenity[];
+}

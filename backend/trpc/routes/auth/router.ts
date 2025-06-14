@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
 import { hash, compare } from "bcryptjs";
-// @ts-ignore
+// @ts-ignore - Add type declaration for jsonwebtoken
 import { sign } from "jsonwebtoken";
 
 export const authRouter = router({
