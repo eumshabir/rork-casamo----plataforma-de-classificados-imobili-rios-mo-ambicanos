@@ -347,8 +347,12 @@ export const authService = {
       
       // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
+        // We need to provide all required parameters for the tRPC call
         const updatedUser = await trpcClient.payment.upgradeToPremium.mutate({
-          planDuration
+          planId: 'monthly', // Default to monthly plan
+          paymentMethod: 'mpesa', // Default payment method
+          phoneNumber: '', // Empty phone number
+          planDuration: planDuration // Pass the plan duration
         });
         
         // Update stored user data

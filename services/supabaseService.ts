@@ -151,7 +151,7 @@ export const supabaseAuthService = {
   loginWithGoogle: async (): Promise<{ user: User; token: string }> => {
     try {
       // Start OAuth flow
-      const { data } = await supabaseHelper.auth.signInWithOAuth('google');
+      const result = await supabaseHelper.auth.signInWithOAuth('google');
       
       // In a real app, we would handle the OAuth redirect and callback
       // For now, we'll simulate a successful login
@@ -185,7 +185,7 @@ export const supabaseAuthService = {
   loginWithFacebook: async (): Promise<{ user: User; token: string }> => {
     try {
       // Start OAuth flow
-      const { data } = await supabaseHelper.auth.signInWithOAuth('facebook');
+      const result = await supabaseHelper.auth.signInWithOAuth('facebook');
       
       // In a real app, we would handle the OAuth redirect and callback
       // For now, we'll simulate a successful login
@@ -378,30 +378,8 @@ export const supabaseAuthService = {
         .select('*')
         .single();
         
-      if (settingsError) {
-        // If settings don't exist, create default settings
-        if (settingsError.code === 'PGRST116') {
-          const defaultSettings = {
-            id: 'settings',
-            premium_monthly_price: 1500,
-            premium_quarterly_price: 4000,
-            premium_yearly_price: 15000,
-            boost_7days_price: 500,
-            boost_15days_price: 900,
-            boost_30days_price: 1600,
-            currency: 'MZN',
-            max_images_per_property: 10,
-            max_properties_for_free_users: 3
-          };
-          
-          const { data: createdSettings, error: createError } = await supabase
-            .from('settings')
-            .insert(defaultSettings)
-            .select()
-            .single();
-            
-          if (createError) throw createError;
-        }
+      if (settingsError && settingsError.code !== 'PGRST116') {
+        throw settingsError;
       }
       
       const plan = settings || {

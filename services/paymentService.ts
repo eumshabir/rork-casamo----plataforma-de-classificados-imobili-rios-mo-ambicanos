@@ -2,6 +2,7 @@ import { authService } from './authService';
 import { handleApiError, shouldUseTRPC, shouldUseSupabase } from './api';
 import { trpcClient } from '@/lib/trpc';
 import { supabaseAuthService } from './supabaseService';
+import { supabasePropertyService } from './supabaseService';
 
 // Payment methods
 export const PAYMENT_METHODS = [
