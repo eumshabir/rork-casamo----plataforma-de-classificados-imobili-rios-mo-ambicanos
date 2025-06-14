@@ -1,21 +1,8 @@
-import { Property, Amenity } from '@/types/property';
+import { Property, Amenity, PropertyFilter } from '@/types/property';
 import { handleApiError, shouldUseTRPC, shouldUseSupabase } from './api';
 import { mockProperties } from '@/mocks/properties';
 import { trpcClient } from '@/lib/trpc';
 import { supabasePropertyService } from './supabaseService';
-
-// Define PropertyFilter interface if it's not exported from types/property
-interface PropertyFilter {
-  type?: string;
-  listingType?: string;
-  province?: string;
-  city?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  minBedrooms?: number;
-  minBathrooms?: number;
-  amenities?: Amenity[];
-}
 
 export const propertyService = {
   // Get all properties with optional filters

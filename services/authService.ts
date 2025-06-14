@@ -352,7 +352,7 @@ export const authService = {
           planId: 'monthly', // Default to monthly plan
           paymentMethod: 'mpesa', // Default payment method
           phoneNumber: '', // Empty phone number
-          planDuration: planDuration // Pass the plan duration
+          planDuration // Pass the plan duration
         });
         
         // Update stored user data

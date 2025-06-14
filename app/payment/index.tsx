@@ -73,7 +73,7 @@ export default function PaymentScreen() {
   };
   
   const handleCopyNumber = async () => {
-    const accountInfo = PAYMENT_ACCOUNTS[selectedMethod as keyof typeof PAYMENT_ACCOUNTS];
+    const accountInfo = PAYMENT_ACCOUNTS[selectedMethod];
     if (accountInfo && typeof accountInfo === 'object' && 'number' in accountInfo) {
       await Clipboard.setStringAsync(accountInfo.number);
       Alert.alert('Copiado', 'Número copiado para a área de transferência');
@@ -150,7 +150,7 @@ export default function PaymentScreen() {
   
   // Helper function to safely get account info
   const getAccountInfo = (method: string, property: 'number' | 'name'): string => {
-    const accountInfo = PAYMENT_ACCOUNTS[method as keyof typeof PAYMENT_ACCOUNTS];
+    const accountInfo = PAYMENT_ACCOUNTS[method];
     if (accountInfo && typeof accountInfo === 'object' && property in accountInfo) {
       return accountInfo[property];
     }
