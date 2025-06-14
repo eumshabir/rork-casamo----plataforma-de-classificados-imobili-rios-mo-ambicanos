@@ -37,6 +37,19 @@ export const PAYMENT_METHODS: PaymentMethod[] = [
   }
 ];
 
+// Payment account details
+export const PAYMENT_ACCOUNTS = {
+  mpesa: {
+    number: '841234567',
+    name: 'CasaMoç'
+  },
+  emola: {
+    number: '861234567',
+    name: 'CasaMoç'
+  },
+  whatsapp: '841234567'
+};
+
 export const paymentService = {
   // Process payment
   processPayment: async (paymentRequest: PaymentRequest): Promise<PaymentResponse> => {
@@ -48,7 +61,7 @@ export const paymentService = {
       
       // If tRPC is not available, use mock
       // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Validate phone number format for Mozambique
       const phoneRegex = /^\+258\s?8[234]\d{7}$/;
@@ -60,23 +73,13 @@ export const paymentService = {
         };
       }
       
-      // Simulate successful payment (90% success rate)
-      const isSuccessful = Math.random() < 0.9;
-      
-      if (isSuccessful) {
-        return {
-          success: true,
-          transactionId: `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          message: 'Pagamento processado com sucesso',
-          timestamp: new Date().toISOString()
-        };
-      } else {
-        return {
-          success: false,
-          message: 'Falha no processamento do pagamento. Tente novamente.',
-          timestamp: new Date().toISOString()
-        };
-      }
+      // For manual payments, always return success
+      return {
+        success: true,
+        transactionId: `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        message: 'Instruções de pagamento enviadas. Por favor, complete o pagamento manualmente.',
+        timestamp: new Date().toISOString()
+      };
     } catch (error) {
       throw new Error(handleApiError(error));
     }
@@ -92,26 +95,15 @@ export const paymentService = {
       
       // If tRPC is not available, use mock
       // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Simulate successful verification (95% success rate)
-      const isVerified = Math.random() < 0.95;
-      
-      if (isVerified) {
-        return {
-          success: true,
-          transactionId,
-          message: 'Pagamento verificado com sucesso',
-          timestamp: new Date().toISOString()
-        };
-      } else {
-        return {
-          success: false,
-          transactionId,
-          message: 'Não foi possível verificar o pagamento. Tente novamente mais tarde.',
-          timestamp: new Date().toISOString()
-        };
-      }
+      // For manual payments, always return pending
+      return {
+        success: false,
+        transactionId,
+        message: 'Aguardando confirmação manual do pagamento. Por favor, envie o comprovativo via WhatsApp.',
+        timestamp: new Date().toISOString()
+      };
     } catch (error) {
       throw new Error(handleApiError(error));
     }

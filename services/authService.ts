@@ -317,19 +317,38 @@ export const authService = {
   },
   
   // Upgrade to premium
-  upgradeToPremium: async (planId: string, paymentMethod: string, phoneNumber: string): Promise<User> => {
+  upgradeToPremium: async (planDuration: number): Promise<User> => {
     try {
       // Try to use Supabase first
       if (await shouldUseSupabase()) {
-        return await supabaseAuthService.upgradeToPremium(planId, paymentMethod, phoneNumber);
+        // For now, we'll just simulate a successful upgrade
+        const userData = await AsyncStorage.getItem(USER_DATA_KEY);
+        if (!userData) {
+          throw new Error('User not authenticated');
+        }
+        
+        const currentUser = JSON.parse(userData);
+        
+        // Calculate premium expiration date
+        const premiumUntil = new Date();
+        premiumUntil.setDate(premiumUntil.getDate() + planDuration);
+        
+        const updatedUser = { 
+          ...currentUser, 
+          role: 'premium' as UserRole,
+          premiumUntil: premiumUntil.toISOString()
+        };
+        
+        // Update in storage
+        await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(updatedUser));
+        
+        return updatedUser;
       }
       
       // Try to use tRPC if Supabase is not available
       if (await shouldUseTRPC()) {
         const updatedUser = await trpcClient.payment.upgradeToPremium.mutate({
-          planId,
-          paymentMethod,
-          phoneNumber,
+          planDuration
         });
         
         // Update stored user data
@@ -349,7 +368,7 @@ export const authService = {
       
       // Calculate premium expiration date
       const premiumUntil = new Date();
-      premiumUntil.setDate(premiumUntil.getDate() + 30); // Default to 30 days
+      premiumUntil.setDate(premiumUntil.getDate() + planDuration);
       
       const updatedUser = { 
         ...currentUser, 
