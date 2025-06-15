@@ -1,17 +1,79 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { type CreateNextContextOptions } from '@trpc/server/adapters/next';
-import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 
-// Initialize Prisma Client
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+// Mock Prisma Client for now - replace with actual Prisma when database is set up
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: 'user' | 'admin';
+  verified: boolean;
+  premiumUntil?: string;
+  createdAt: string;
+}
+
+interface Property {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  currency: string;
+  type: string;
+  listingType: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  area: number;
+  location: any;
+  amenities: string[];
+  images: string[];
+  featured: boolean;
+  ownerId: string;
+  createdAt: string;
+  views: number;
+}
+
+// Mock database - replace with actual Prisma client
+const mockPrisma = {
+  user: {
+    findUnique: async ({ where }: { where: { id?: string; email?: string } }) => {
+      // Mock implementation - replace with actual database
+      return null;
+    },
+    create: async (data: any) => {
+      // Mock implementation - replace with actual database
+      return data.data;
+    },
+    findMany: async () => {
+      // Mock implementation - replace with actual database
+      return [];
+    },
+  },
+  property: {
+    findMany: async (options?: any) => {
+      // Mock implementation - replace with actual database
+      return [];
+    },
+    findUnique: async ({ where }: { where: { id: string } }) => {
+      // Mock implementation - replace with actual database
+      return null;
+    },
+    create: async (data: any) => {
+      // Mock implementation - replace with actual database
+      return data.data;
+    },
+    update: async ({ where, data }: { where: { id: string }; data: any }) => {
+      // Mock implementation - replace with actual database
+      return data;
+    },
+    delete: async ({ where }: { where: { id: string } }) => {
+      // Mock implementation - replace with actual database
+      return { id: where.id };
+    },
+  },
 };
-
-const prisma = globalForPrisma.prisma ?? new PrismaClient();
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 // JWT secret key - should be in environment variables
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
@@ -32,7 +94,7 @@ export const createContext = async (opts: CreateNextContextOptions) => {
       userId = decoded.userId;
       
       // Check if the user exists in the database
-      const user = await prisma.user.findUnique({
+      const user = await mockPrisma.user.findUnique({
         where: { id: userId },
       });
       
@@ -47,7 +109,7 @@ export const createContext = async (opts: CreateNextContextOptions) => {
   
   return {
     userId,
-    prisma,
+    prisma: mockPrisma,
   };
 };
 

@@ -19,7 +19,7 @@ import { getUserByIdProcedure } from "./routes/user/get-user-by-id/route";
 import { getUsersProcedure } from "./routes/user/get-users/route";
 
 // Example route
-import hiProcedure from "./routes/example/hi/route";
+import { hiProcedure } from "./routes/example/hi/route";
 
 export const appRouter = router({
   example: router({

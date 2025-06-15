@@ -26,7 +26,12 @@ export const authService = {
   // Register new user
   register: async (userData: { name: string; email: string; phone: string; password: string }): Promise<{ user: User; token: string }> => {
     try {
-      const response = await trpcClient.auth.register.mutate(userData);
+      const response = await trpcClient.auth.register.mutate({
+        name: userData.name,
+        email: userData.email,
+        phone: userData.phone,
+        password: userData.password,
+      });
       
       // Store auth data
       await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.token);

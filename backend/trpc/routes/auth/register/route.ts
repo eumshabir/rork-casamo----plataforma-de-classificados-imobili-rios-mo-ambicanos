@@ -16,32 +16,23 @@ export const registerProcedure = publicProcedure
   .mutation(async ({ input, ctx }) => {
     const { name, email, phone, password } = input;
     
-    // Check if user already exists
-    const existingUser = await ctx.prisma.user.findUnique({
-      where: { email },
-    });
-    
-    if (existingUser) {
-      throw new TRPCError({
-        code: 'CONFLICT',
-        message: 'User with this email already exists',
-      });
-    }
+    // Check if user already exists (mock implementation)
+    // In real implementation, check against database
     
     // Hash password
     const passwordHash = await bcrypt.hash(password, 12);
     
-    // Create user
-    const user = await ctx.prisma.user.create({
-      data: {
-        name,
-        email,
-        phone,
-        passwordHash,
-        role: 'user',
-        verified: false,
-      },
-    });
+    // Create user (mock implementation)
+    const user = {
+      id: Date.now().toString(), // Mock ID generation
+      name,
+      email,
+      phone,
+      passwordHash,
+      role: 'user' as const,
+      verified: false,
+      createdAt: new Date().toISOString(),
+    };
     
     // Generate JWT token
     const token = jwt.sign(

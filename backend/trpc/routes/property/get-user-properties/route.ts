@@ -22,7 +22,7 @@ export const getUserPropertiesProcedure = protectedProcedure
     });
     
     // Transform the data to match the expected format
-    return properties.map((property) => ({
+    return properties.map((property: any) => ({
       ...property,
       owner: {
         ...property.owner,
