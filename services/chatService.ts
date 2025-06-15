@@ -1,4 +1,4 @@
-import { apiClient, handleApiError } from './api';
+import { supabase } from '@/lib/supabase';
 
 export interface ChatMessage {
   id: string;
@@ -22,260 +22,335 @@ export interface ChatConversation {
   updatedAt: string;
 }
 
-// Mock data for conversations
-const MOCK_CONVERSATIONS: ChatConversation[] = [
-  {
-    id: 'conv-1',
-    participants: [
-      {
-        id: '2',
-        name: 'Maria Costa',
-        avatar: 'https://randomuser.me/api/portraits/women/44.jpg'
-      }
-    ],
-    lastMessage: {
-      id: 'msg-3',
-      conversationId: 'conv-1',
-      senderId: '2',
-      receiverId: '1',
-      content: 'Olá, o imóvel ainda está disponível?',
-      read: false,
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-    },
-    unreadCount: 1,
-    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'conv-2',
-    participants: [
-      {
-        id: '3',
-        name: 'Carlos Matlombe',
-        avatar: 'https://randomuser.me/api/portraits/men/32.jpg'
-      }
-    ],
-    lastMessage: {
-      id: 'msg-2',
-      conversationId: 'conv-2',
-      senderId: '1',
-      receiverId: '3',
-      content: 'Sim, podemos marcar uma visita para amanhã às 15h.',
-      read: true,
-      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-    },
-    unreadCount: 0,
-    updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-  }
-];
-
-// Mock data for messages
-const MOCK_MESSAGES: Record<string, ChatMessage[]> = {
-  'conv-1': [
-    {
-      id: 'msg-1',
-      conversationId: 'conv-1',
-      senderId: '2',
-      receiverId: '1',
-      content: 'Olá, estou interessado no seu apartamento na Polana.',
-      read: true,
-      createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: 'msg-3',
-      conversationId: 'conv-1',
-      senderId: '2',
-      receiverId: '1',
-      content: 'Olá, o imóvel ainda está disponível?',
-      read: false,
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-    }
-  ],
-  'conv-2': [
-    {
-      id: 'msg-4',
-      conversationId: 'conv-2',
-      senderId: '3',
-      receiverId: '1',
-      content: 'Bom dia, gostaria de agendar uma visita ao imóvel.',
-      read: true,
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: 'msg-2',
-      conversationId: 'conv-2',
-      senderId: '1',
-      receiverId: '3',
-      content: 'Sim, podemos marcar uma visita para amanhã às 15h.',
-      read: true,
-      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-    }
-  ]
-};
-
 export const chatService = {
   // Get all conversations for the current user
   getConversations: async (): Promise<ChatConversation[]> => {
-    try {
-      // Try to use the real API first
-      const response = await apiClient.get('/chat/conversations');
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
-      await new Promise(resolve => setTimeout(resolve, 800));
-      return MOCK_CONVERSATIONS;
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error('User not authenticated');
     }
+
+    const { data, error } = await supabase
+      .from('conversation_participants')
+      .select(`
+        conversations (
+          id,
+          created_at,
+          updated_at
+        )
+      `)
+      .eq('user_id', user.id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const conversations: ChatConversation[] = [];
+
+    for (const item of data) {
+      const conversation = item.conversations as any;
+      
+      // Get other participants
+      const { data: participants } = await supabase
+        .from('conversation_participants')
+        .select(`
+          users (
+            id,
+            name,
+            email
+          )
+        `)
+        .eq('conversation_id', conversation.id)
+        .neq('user_id', user.id);
+
+      // Get last message
+      const { data: lastMessage } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversation.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      // Get unread count
+      const { count: unreadCount } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('conversation_id', conversation.id)
+        .eq('read', false)
+        .neq('sender_id', user.id);
+
+      conversations.push({
+        id: conversation.id,
+        participants: participants?.map(p => ({
+          id: (p.users as any).id,
+          name: (p.users as any).name,
+          avatar: `https://randomuser.me/api/portraits/lego/1.jpg`,
+        })) || [],
+        lastMessage: lastMessage ? {
+          id: lastMessage.id,
+          conversationId: lastMessage.conversation_id,
+          senderId: lastMessage.sender_id,
+          receiverId: '', // We'll need to determine this
+          content: lastMessage.content,
+          read: lastMessage.read,
+          createdAt: lastMessage.created_at,
+        } : undefined,
+        unreadCount: unreadCount || 0,
+        updatedAt: conversation.updated_at,
+      });
+    }
+
+    return conversations.sort((a, b) => 
+      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    );
   },
-  
+
   // Get messages for a specific conversation
   getMessages: async (conversationId: string): Promise<ChatMessage[]> => {
-    try {
-      // Try to use the real API first
-      const response = await apiClient.get(`/chat/conversations/${conversationId}/messages`);
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
-      await new Promise(resolve => setTimeout(resolve, 600));
-      return MOCK_MESSAGES[conversationId] || [];
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error('User not authenticated');
     }
+
+    // Verify user is part of this conversation
+    const { data: participant } = await supabase
+      .from('conversation_participants')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!participant) {
+      throw new Error('Unauthorized access to conversation');
+    }
+
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data.map(message => ({
+      id: message.id,
+      conversationId: message.conversation_id,
+      senderId: message.sender_id,
+      receiverId: '', // We'll determine this based on participants
+      content: message.content,
+      read: message.read,
+      createdAt: message.created_at,
+    }));
   },
-  
+
   // Send a message
   sendMessage: async (conversationId: string, content: string, receiverId: string): Promise<ChatMessage> => {
-    try {
-      // Try to use the real API first
-      const response = await apiClient.post(`/chat/conversations/${conversationId}/messages`, {
-        content,
-        receiverId
-      });
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const newMessage: ChatMessage = {
-        id: `msg-${Date.now()}`,
-        conversationId,
-        senderId: '1', // Current user ID
-        receiverId,
-        content,
-        read: false,
-        createdAt: new Date().toISOString()
-      };
-      
-      // Add to mock data
-      if (!MOCK_MESSAGES[conversationId]) {
-        MOCK_MESSAGES[conversationId] = [];
-      }
-      
-      MOCK_MESSAGES[conversationId].push(newMessage);
-      
-      // Update last message in conversation
-      const conversationIndex = MOCK_CONVERSATIONS.findIndex(c => c.id === conversationId);
-      if (conversationIndex !== -1) {
-        MOCK_CONVERSATIONS[conversationIndex].lastMessage = newMessage;
-        MOCK_CONVERSATIONS[conversationIndex].updatedAt = newMessage.createdAt;
-      }
-      
-      return newMessage;
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error('User not authenticated');
     }
+
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    // Update conversation timestamp
+    await supabase
+      .from('conversations')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', conversationId);
+
+    return {
+      id: data.id,
+      conversationId: data.conversation_id,
+      senderId: data.sender_id,
+      receiverId,
+      content: data.content,
+      read: data.read,
+      createdAt: data.created_at,
+    };
   },
-  
+
   // Create a new conversation
   createConversation: async (receiverId: string, initialMessage: string): Promise<ChatConversation> => {
-    try {
-      // Try to use the real API first
-      const response = await apiClient.post('/chat/conversations', {
-        receiverId,
-        initialMessage
-      });
-      return response.data;
-    } catch (error) {
-      // If API is not available, use mock
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      const newConversationId = `conv-${Date.now()}`;
-      
-      const newMessage: ChatMessage = {
-        id: `msg-${Date.now()}`,
-        conversationId: newConversationId,
-        senderId: '1', // Current user ID
-        receiverId,
-        content: initialMessage,
-        read: false,
-        createdAt: new Date().toISOString()
-      };
-      
-      // Create mock conversation
-      const newConversation: ChatConversation = {
-        id: newConversationId,
-        participants: [
-          {
-            id: receiverId,
-            name: 'Novo Contacto',
-            avatar: 'https://randomuser.me/api/portraits/lego/1.jpg'
-          }
-        ],
-        lastMessage: newMessage,
-        unreadCount: 0,
-        updatedAt: newMessage.createdAt
-      };
-      
-      // Add to mock data
-      MOCK_CONVERSATIONS.unshift(newConversation);
-      MOCK_MESSAGES[newConversationId] = [newMessage];
-      
-      return newConversation;
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error('User not authenticated');
     }
+
+    // Check if conversation already exists between these users
+    const { data: existingConversations } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', user.id);
+
+    if (existingConversations) {
+      for (const conv of existingConversations) {
+        const { data: otherParticipant } = await supabase
+          .from('conversation_participants')
+          .select('user_id')
+          .eq('conversation_id', conv.conversation_id)
+          .eq('user_id', receiverId)
+          .single();
+
+        if (otherParticipant) {
+          // Conversation already exists, just send message
+          await chatService.sendMessage(conv.conversation_id, initialMessage, receiverId);
+          
+          // Return existing conversation
+          const conversations = await chatService.getConversations();
+          return conversations.find(c => c.id === conv.conversation_id)!;
+        }
+      }
+    }
+
+    // Create new conversation
+    const { data: conversation, error: convError } = await supabase
+      .from('conversations')
+      .insert({})
+      .select()
+      .single();
+
+    if (convError) {
+      throw new Error(convError.message);
+    }
+
+    // Add participants
+    const { error: participantError } = await supabase
+      .from('conversation_participants')
+      .insert([
+        { conversation_id: conversation.id, user_id: user.id },
+        { conversation_id: conversation.id, user_id: receiverId },
+      ]);
+
+    if (participantError) {
+      throw new Error(participantError.message);
+    }
+
+    // Send initial message
+    const message = await chatService.sendMessage(conversation.id, initialMessage, receiverId);
+
+    // Get receiver info
+    const { data: receiver } = await supabase
+      .from('users')
+      .select('id, name')
+      .eq('id', receiverId)
+      .single();
+
+    return {
+      id: conversation.id,
+      participants: [
+        {
+          id: receiverId,
+          name: receiver?.name || 'Unknown User',
+          avatar: `https://randomuser.me/api/portraits/lego/1.jpg`,
+        },
+      ],
+      lastMessage: message,
+      unreadCount: 0,
+      updatedAt: conversation.updated_at,
+    };
   },
-  
+
   // Mark messages as read
   markAsRead: async (conversationId: string): Promise<boolean> => {
-    try {
-      // Try to use the real API first
-      await apiClient.put(`/chat/conversations/${conversationId}/read`);
-      return true;
-    } catch (error) {
-      // If API is not available, use mock
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Update mock data
-      if (MOCK_MESSAGES[conversationId]) {
-        MOCK_MESSAGES[conversationId].forEach(msg => {
-          if (msg.receiverId === '1') { // Current user is receiver
-            msg.read = true;
-          }
-        });
-      }
-      
-      // Update unread count in conversation
-      const conversationIndex = MOCK_CONVERSATIONS.findIndex(c => c.id === conversationId);
-      if (conversationIndex !== -1) {
-        MOCK_CONVERSATIONS[conversationIndex].unreadCount = 0;
-      }
-      
-      return true;
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error('User not authenticated');
     }
+
+    const { error } = await supabase
+      .from('messages')
+      .update({ read: true })
+      .eq('conversation_id', conversationId)
+      .neq('sender_id', user.id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return true;
   },
-  
+
   // Delete a conversation
   deleteConversation: async (conversationId: string): Promise<boolean> => {
-    try {
-      // Try to use the real API first
-      await apiClient.delete(`/chat/conversations/${conversationId}`);
-      return true;
-    } catch (error) {
-      // If API is not available, use mock
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Remove from mock data
-      const conversationIndex = MOCK_CONVERSATIONS.findIndex(c => c.id === conversationId);
-      if (conversationIndex !== -1) {
-        MOCK_CONVERSATIONS.splice(conversationIndex, 1);
-      }
-      
-      delete MOCK_MESSAGES[conversationId];
-      
-      return true;
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error('User not authenticated');
     }
-  }
+
+    // Remove user from conversation participants
+    const { error } = await supabase
+      .from('conversation_participants')
+      .delete()
+      .eq('conversation_id', conversationId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    // Check if conversation has any participants left
+    const { count } = await supabase
+      .from('conversation_participants')
+      .select('*', { count: 'exact', head: true })
+      .eq('conversation_id', conversationId);
+
+    // If no participants left, delete the conversation
+    if (count === 0) {
+      await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId);
+    }
+
+    return true;
+  },
+
+  // Subscribe to real-time messages
+  subscribeToMessages: (conversationId: string, callback: (message: ChatMessage) => void) => {
+    return supabase
+      .channel(`messages:${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const message = payload.new as any;
+          callback({
+            id: message.id,
+            conversationId: message.conversation_id,
+            senderId: message.sender_id,
+            receiverId: '', // We'll determine this
+            content: message.content,
+            read: message.read,
+            createdAt: message.created_at,
+          });
+        }
+      )
+      .subscribe();
+  },
 };

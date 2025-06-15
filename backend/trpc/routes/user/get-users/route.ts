@@ -1,45 +1,54 @@
 import { z } from "zod";
-import { protectedProcedure } from "@/backend/trpc/create-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { adminProcedure } from "@/backend/trpc/create-context";
 
-export const getUsersProcedure = protectedProcedure
+export const getUsersProcedure = adminProcedure
   .input(
     z.object({
-      limit: z.number().int().min(1).max(100).default(10),
-      offset: z.number().int().min(0).default(0),
+      page: z.number().int().positive().default(1),
+      limit: z.number().int().positive().max(100).default(10),
+      search: z.string().optional(),
       role: z.enum(['user', 'premium', 'admin']).optional(),
-      isAdmin: z.boolean().default(true), // Require admin privileges
-    }).optional()
+    })
   )
   .query(async ({ input, ctx }) => {
-    // In a real app, we would check if the current user has admin privileges
-    if (input && !input.isAdmin) {
-      throw new Error("Unauthorized: Admin privileges required");
+    const { page, limit, search, role } = input;
+    const offset = (page - 1) * limit;
+
+    let query = ctx.supabase
+      .from('users')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    // Apply filters
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
     }
 
-    try {
-      // Get users from AsyncStorage
-      const storedUsers = await AsyncStorage.getItem('mock_users');
-      let users = storedUsers ? JSON.parse(storedUsers) : [];
-
-      // Apply filters if provided
-      if (input?.role) {
-        users = users.filter(user => user.role === input.role);
-      }
-
-      // Apply pagination
-      const limit = input?.limit || 10;
-      const offset = input?.offset || 0;
-      const paginatedUsers = users.slice(offset, offset + limit);
-
-      return {
-        users: paginatedUsers,
-        total: users.length,
-        limit,
-        offset,
-      };
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      throw new Error("Failed to fetch users");
+    if (role) {
+      query = query.eq('role', role);
     }
+
+    const { data: users, error, count } = await query;
+
+    if (error) {
+      throw new Error(`Failed to fetch users: ${error.message}`);
+    }
+
+    return {
+      users: users?.map(user => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        verified: user.verified,
+        premiumUntil: user.premium_until,
+        createdAt: user.created_at,
+      })) || [],
+      total: count || 0,
+      page,
+      limit,
+      totalPages: Math.ceil((count || 0) / limit),
+    };
   });

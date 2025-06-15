@@ -1,386 +1,345 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '@/lib/supabase';
 import { User, UserRole } from '@/types/user';
-import { apiClient } from './api';
-
-// Mock API endpoints
-const MOCK_API_DELAY = 800;
-
-// Mock user database
-const MOCK_USERS = [
-  {
-    id: '1',
-    name: 'João Silva',
-    email: 'joao@example.com',
-    phone: '+258 84 123 4567',
-    password: 'password123',
-    role: 'user' as UserRole,
-    verified: true,
-    createdAt: '2023-01-15T10:30:00Z',
-  },
-  {
-    id: '2',
-    name: 'Maria Costa',
-    email: 'maria@example.com',
-    phone: '+258 82 987 6543',
-    password: 'password123',
-    role: 'premium' as UserRole,
-    verified: true,
-    premiumUntil: '2024-12-31T23:59:59Z',
-    createdAt: '2023-02-20T14:45:00Z',
-  }
-];
-
-// Auth token storage key
-const AUTH_TOKEN_KEY = 'auth_token';
-const USER_DATA_KEY = 'user_data';
 
 export const authService = {
   // Email & Password Login
   login: async (email: string, password: string): Promise<{ user: User; token: string }> => {
-    try {
-      // Try to use the real API first
-      const response = await apiClient.post('/auth/login', { email, password });
-      
-      // Store auth data
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.data.token);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data.user));
-      
-      return response.data;
-    } catch (error) {
-      // Fallback to mock if API is not available
-      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
-      
-      const user = MOCK_USERS.find(u => u.email === email);
-      
-      if (!user || user.password !== password) {
-        throw new Error('Invalid credentials');
-      }
-      
-      const { password: _, ...userWithoutPassword } = user;
-      const token = `mock-token-${Date.now()}`;
-      
-      // Store auth data
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(userWithoutPassword));
-      
-      return { 
-        user: userWithoutPassword as User, 
-        token 
-      };
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      throw new Error(error.message);
     }
+
+    if (!data.user) {
+      throw new Error('Login failed');
+    }
+
+    // Get user profile from our users table
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
+
+    if (profileError) {
+      throw new Error('Failed to get user profile');
+    }
+
+    const user: User = {
+      id: userProfile.id,
+      name: userProfile.name,
+      email: userProfile.email,
+      phone: userProfile.phone || '',
+      role: userProfile.role as UserRole,
+      verified: userProfile.verified,
+      premiumUntil: userProfile.premium_until || undefined,
+      createdAt: userProfile.created_at,
+    };
+
+    return {
+      user,
+      token: data.session?.access_token || '',
+    };
   },
-  
+
   // Register new user
   register: async (userData: Partial<User>, password: string): Promise<{ user: User; token: string }> => {
-    try {
-      // Try to use the real API first
-      const response = await apiClient.post('/auth/register', { ...userData, password });
-      
-      // Store auth data
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.data.token);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data.user));
-      
-      return response.data;
-    } catch (error) {
-      // Fallback to mock if API is not available
-      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
-      
-      // Check if email already exists
-      if (MOCK_USERS.some(u => u.email === userData.email)) {
-        throw new Error('Email already in use');
-      }
-      
-      // Create new user
-      const newUser = {
-        id: `${MOCK_USERS.length + 1}`,
-        name: userData.name || '',
-        email: userData.email || '',
-        phone: userData.phone || '',
-        password,
-        role: 'user' as UserRole,
-        verified: false,
-        createdAt: new Date().toISOString(),
-      };
-      
-      // In a real app, we would save this to a database
-      MOCK_USERS.push(newUser);
-      
-      const { password: _, ...userWithoutPassword } = newUser;
-      const token = `mock-token-${Date.now()}`;
-      
-      // Store auth data
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(userWithoutPassword));
-      
-      return { 
-        user: userWithoutPassword as User, 
-        token 
-      };
+    const { data, error } = await supabase.auth.signUp({
+      email: userData.email!,
+      password,
+      options: {
+        data: {
+          name: userData.name,
+          phone: userData.phone,
+        },
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message);
     }
+
+    if (!data.user) {
+      throw new Error('Registration failed');
+    }
+
+    // Update user profile in our users table
+    const { data: userProfile, error: updateError } = await supabase
+      .from('users')
+      .update({
+        name: userData.name || '',
+        phone: userData.phone || null,
+      })
+      .eq('id', data.user.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new Error('Failed to update user profile');
+    }
+
+    const user: User = {
+      id: userProfile.id,
+      name: userProfile.name,
+      email: userProfile.email,
+      phone: userProfile.phone || '',
+      role: userProfile.role as UserRole,
+      verified: userProfile.verified,
+      premiumUntil: userProfile.premium_until || undefined,
+      createdAt: userProfile.created_at,
+    };
+
+    return {
+      user,
+      token: data.session?.access_token || '',
+    };
   },
-  
+
   // Google OAuth login
   loginWithGoogle: async (): Promise<{ user: User; token: string }> => {
-    try {
-      // Try to use the real API first
-      const response = await apiClient.post('/auth/google');
-      
-      // Store auth data
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.data.token);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data.user));
-      
-      return response.data;
-    } catch (error) {
-      // Fallback to mock if API is not available
-      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
-      
-      // Mock Google auth response
-      const googleUser = {
-        id: 'google-123',
-        name: 'Google User',
-        email: 'google.user@example.com',
-        phone: '',
-        role: 'user' as UserRole,
-        verified: true,
-        createdAt: new Date().toISOString(),
-      };
-      
-      const token = `google-token-${Date.now()}`;
-      
-      // Store auth data
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(googleUser));
-      
-      return { user: googleUser, token };
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+    });
+
+    if (error) {
+      throw new Error(error.message);
     }
+
+    // Note: In a real app, this would redirect to Google OAuth
+    // For now, we'll throw an error to indicate it's not fully implemented
+    throw new Error('Google OAuth requires proper setup in Supabase dashboard');
   },
-  
+
   // Facebook OAuth login
   loginWithFacebook: async (): Promise<{ user: User; token: string }> => {
-    try {
-      // Try to use the real API first
-      const response = await apiClient.post('/auth/facebook');
-      
-      // Store auth data
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.data.token);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data.user));
-      
-      return response.data;
-    } catch (error) {
-      // Fallback to mock if API is not available
-      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
-      
-      // Mock Facebook auth response
-      const facebookUser = {
-        id: 'facebook-123',
-        name: 'Facebook User',
-        email: 'facebook.user@example.com',
-        phone: '',
-        role: 'user' as UserRole,
-        verified: true,
-        createdAt: new Date().toISOString(),
-      };
-      
-      const token = `facebook-token-${Date.now()}`;
-      
-      // Store auth data
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(facebookUser));
-      
-      return { user: facebookUser, token };
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+    });
+
+    if (error) {
+      throw new Error(error.message);
     }
+
+    // Note: In a real app, this would redirect to Facebook OAuth
+    // For now, we'll throw an error to indicate it's not fully implemented
+    throw new Error('Facebook OAuth requires proper setup in Supabase dashboard');
   },
-  
+
   // Logout
   logout: async (): Promise<void> => {
-    try {
-      // Try to use the real API first
-      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-      if (token) {
-        await apiClient.post('/auth/logout', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      }
-    } catch (error) {
-      // Ignore errors from API
-    } finally {
-      // Always remove local storage items
-      await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
-      await AsyncStorage.removeItem(USER_DATA_KEY);
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      throw new Error(error.message);
     }
   },
-  
+
   // Check if user is logged in
   isAuthenticated: async (): Promise<boolean> => {
-    const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-    return !!token;
+    const { data: { session } } = await supabase.auth.getSession();
+    return !!session;
   },
-  
+
   // Get current user data
   getCurrentUser: async (): Promise<User | null> => {
-    try {
-      // Try to get from API first
-      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-      if (token) {
-        const response = await apiClient.get('/auth/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        // Update stored user data
-        await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data));
-        return response.data;
-      }
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
       return null;
-    } catch (error) {
-      // Fallback to local storage
-      const userData = await AsyncStorage.getItem(USER_DATA_KEY);
-      return userData ? JSON.parse(userData) : null;
     }
+
+    // Get user profile from our users table
+    const { data: userProfile, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      return null;
+    }
+
+    return {
+      id: userProfile.id,
+      name: userProfile.name,
+      email: userProfile.email,
+      phone: userProfile.phone || '',
+      role: userProfile.role as UserRole,
+      verified: userProfile.verified,
+      premiumUntil: userProfile.premium_until || undefined,
+      createdAt: userProfile.created_at,
+    };
   },
-  
+
   // Update user profile
   updateProfile: async (updates: Partial<User>): Promise<User> => {
-    try {
-      // Try to use the real API first
-      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-      if (!token) throw new Error('User not authenticated');
-      
-      const response = await apiClient.put('/users/profile', updates, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      // Update stored user data
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data));
-      return response.data;
-    } catch (error) {
-      // Fallback to mock if API is not available
-      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
-      
-      const userData = await AsyncStorage.getItem(USER_DATA_KEY);
-      if (!userData) {
-        throw new Error('User not authenticated');
-      }
-      
-      const currentUser = JSON.parse(userData);
-      const updatedUser = { ...currentUser, ...updates };
-      
-      // Update in mock database
-      const userIndex = MOCK_USERS.findIndex(u => u.id === currentUser.id);
-      if (userIndex >= 0) {
-        MOCK_USERS[userIndex] = { 
-          ...MOCK_USERS[userIndex], 
-          ...updates,
-          password: MOCK_USERS[userIndex].password // Keep the password
-        };
-      }
-      
-      // Update in storage
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(updatedUser));
-      
-      return updatedUser;
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error('User not authenticated');
     }
+
+    const { data: userProfile, error } = await supabase
+      .from('users')
+      .update({
+        name: updates.name,
+        phone: updates.phone || null,
+      })
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return {
+      id: userProfile.id,
+      name: userProfile.name,
+      email: userProfile.email,
+      phone: userProfile.phone || '',
+      role: userProfile.role as UserRole,
+      verified: userProfile.verified,
+      premiumUntil: userProfile.premium_until || undefined,
+      createdAt: userProfile.created_at,
+    };
   },
-  
+
   // Upgrade to premium
   upgradeToPremium: async (planDuration: number): Promise<User> => {
-    try {
-      // Try to use the real API first
-      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-      if (!token) throw new Error('User not authenticated');
-      
-      const response = await apiClient.post('/users/premium', { planDuration }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      // Update stored user data
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data));
-      return response.data;
-    } catch (error) {
-      // Fallback to mock if API is not available
-      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
-      
-      const userData = await AsyncStorage.getItem(USER_DATA_KEY);
-      if (!userData) {
-        throw new Error('User not authenticated');
-      }
-      
-      const currentUser = JSON.parse(userData);
-      
-      // Calculate premium expiration date
-      const premiumUntil = new Date();
-      premiumUntil.setDate(premiumUntil.getDate() + planDuration);
-      
-      const updatedUser = { 
-        ...currentUser, 
-        role: 'premium' as UserRole,
-        premiumUntil: premiumUntil.toISOString()
-      };
-      
-      // Update in mock database
-      const userIndex = MOCK_USERS.findIndex(u => u.id === currentUser.id);
-      if (userIndex >= 0) {
-        MOCK_USERS[userIndex] = { 
-          ...MOCK_USERS[userIndex], 
-          role: 'premium' as UserRole,
-          premiumUntil: premiumUntil.toISOString()
-        };
-      }
-      
-      // Update in storage
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(updatedUser));
-      
-      return updatedUser;
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error('User not authenticated');
     }
+
+    // Calculate premium expiration date
+    const premiumUntil = new Date();
+    premiumUntil.setDate(premiumUntil.getDate() + planDuration);
+
+    const { data: userProfile, error } = await supabase
+      .from('users')
+      .update({
+        role: 'premium',
+        premium_until: premiumUntil.toISOString(),
+      })
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return {
+      id: userProfile.id,
+      name: userProfile.name,
+      email: userProfile.email,
+      phone: userProfile.phone || '',
+      role: userProfile.role as UserRole,
+      verified: userProfile.verified,
+      premiumUntil: userProfile.premium_until || undefined,
+      createdAt: userProfile.created_at,
+    };
   },
-  
+
   // Verify phone number with SMS code
   verifyPhone: async (phone: string, code: string): Promise<boolean> => {
-    try {
-      // Try to use the real API first
-      const response = await apiClient.post('/auth/verify-phone', { phone, code });
-      return response.data.success;
-    } catch (error) {
-      // Fallback to mock if API is not available
-      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
-      
-      // Mock verification (always succeeds with code "123456")
-      return code === "123456";
+    // Note: Supabase doesn't have built-in SMS verification
+    // You would need to integrate with a service like Twilio
+    // For now, we'll just update the phone number
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error('User not authenticated');
     }
+
+    // Mock verification (always succeeds with code "123456")
+    if (code !== "123456") {
+      throw new Error('Invalid verification code');
+    }
+
+    const { error } = await supabase
+      .from('users')
+      .update({
+        phone,
+        verified: true,
+      })
+      .eq('id', user.id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return true;
   },
-  
+
   // Request SMS verification code
   requestVerificationCode: async (phone: string): Promise<boolean> => {
-    try {
-      // Try to use the real API first
-      const response = await apiClient.post('/auth/request-code', { phone });
-      return response.data.success;
-    } catch (error) {
-      // Fallback to mock if API is not available
-      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
-      
-      // Mock request (always succeeds)
-      return true;
-    }
+    // Note: This would integrate with an SMS service like Twilio
+    // For now, we'll just return true
+    return true;
   },
-  
+
   // Reset password
   resetPassword: async (email: string): Promise<boolean> => {
-    try {
-      // Try to use the real API first
-      const response = await apiClient.post('/auth/reset-password', { email });
-      return response.data.success;
-    } catch (error) {
-      // Fallback to mock if API is not available
-      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
-      
-      // Check if email exists
-      const userExists = MOCK_USERS.some(u => u.email === email);
-      if (!userExists) {
-        throw new Error('Email not found');
-      }
-      
-      // Mock reset (always succeeds if email exists)
-      return true;
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    
+    if (error) {
+      throw new Error(error.message);
     }
-  }
+
+    return true;
+  },
+
+  // Set user as premium (admin function)
+  setPremium: async (userId: string, duration: number): Promise<User> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    // Check if current user is admin
+    const { data: currentUserProfile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (currentUserProfile?.role !== 'admin') {
+      throw new Error('Unauthorized: Admin privileges required');
+    }
+
+    // Calculate premium expiration date
+    const premiumUntil = new Date();
+    premiumUntil.setDate(premiumUntil.getDate() + duration);
+
+    const { data: userProfile, error } = await supabase
+      .from('users')
+      .update({
+        role: 'premium',
+        premium_until: premiumUntil.toISOString(),
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return {
+      id: userProfile.id,
+      name: userProfile.name,
+      email: userProfile.email,
+      phone: userProfile.phone || '',
+      role: userProfile.role as UserRole,
+      verified: userProfile.verified,
+      premiumUntil: userProfile.premium_until || undefined,
+      createdAt: userProfile.created_at,
+    };
+  },
 };
