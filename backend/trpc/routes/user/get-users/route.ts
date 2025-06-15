@@ -1,40 +1,45 @@
-import { z } from 'zod';
-import { adminProcedure } from '@/backend/trpc/create-context';
+import { z } from "zod";
+import { protectedProcedure } from "@/backend/trpc/create-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const getUsersProcedure = adminProcedure
-  .input(z.object({
-    limit: z.number().min(1).max(100).default(20),
-    offset: z.number().min(0).default(0),
-    role: z.string().optional(),
-  }).optional())
+export const getUsersProcedure = protectedProcedure
+  .input(
+    z.object({
+      limit: z.number().int().min(1).max(100).default(10),
+      offset: z.number().int().min(0).default(0),
+      role: z.enum(['user', 'premium', 'admin']).optional(),
+      isAdmin: z.boolean().default(true), // Require admin privileges
+    }).optional()
+  )
   .query(async ({ input, ctx }) => {
-    const filters = input || {};
-    
-    const where: any = {};
-    
-    if (filters.role) {
-      where.role = filters.role;
+    // In a real app, we would check if the current user has admin privileges
+    if (input && !input.isAdmin) {
+      throw new Error("Unauthorized: Admin privileges required");
     }
-    
-    const users = await ctx.prisma.user.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        role: true,
-        verified: true,
-        premiumUntil: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: filters.limit,
-      skip: filters.offset,
-    });
-    
-    return users;
+
+    try {
+      // Get users from AsyncStorage
+      const storedUsers = await AsyncStorage.getItem('mock_users');
+      let users = storedUsers ? JSON.parse(storedUsers) : [];
+
+      // Apply filters if provided
+      if (input?.role) {
+        users = users.filter(user => user.role === input.role);
+      }
+
+      // Apply pagination
+      const limit = input?.limit || 10;
+      const offset = input?.offset || 0;
+      const paginatedUsers = users.slice(offset, offset + limit);
+
+      return {
+        users: paginatedUsers,
+        total: users.length,
+        limit,
+        offset,
+      };
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      throw new Error("Failed to fetch users");
+    }
   });

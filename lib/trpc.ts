@@ -1,49 +1,25 @@
-import { createTRPCReact } from '@trpc/react-query';
-import { createTRPCClient, httpBatchLink } from '@trpc/client';
-import { QueryClient } from '@tanstack/react-query';
-import Constants from 'expo-constants';
-import superjson from 'superjson';
-import type { AppRouter } from '@/backend/trpc/app-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createTRPCReact } from "@trpc/react-query";
+import { httpLink } from "@trpc/client";
+import type { AppRouter } from "@/backend/trpc/app-router";
+import superjson from "superjson";
 
-// Create React Query client
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-    },
-  },
-});
+export const trpc = createTRPCReact<AppRouter>();
 
-// Get the API URL from environment variables or use a default
 const getBaseUrl = () => {
-  // For development, use the local server
-  if (__DEV__) {
-    const localhost = Constants.expoConfig?.hostUri?.split(':')[0];
-    if (localhost) {
-      return `http://${localhost}:3000/api`;
-    }
+  if (process.env.EXPO_PUBLIC_RORK_API_BASE_URL) {
+    return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
   }
-  
-  // For production, use the deployed API
-  return process.env.EXPO_PUBLIC_API_URL || 'https://your-production-api.com/api';
+
+  throw new Error(
+    "No base url found, please set EXPO_PUBLIC_RORK_API_BASE_URL"
+  );
 };
 
-// Create the tRPC client
-export const trpcClient = createTRPCClient<AppRouter>({
+export const trpcClient = trpc.createClient({
   links: [
-    httpBatchLink({
-      url: `${getBaseUrl()}/trpc`,
-      async headers() {
-        const token = await AsyncStorage.getItem('auth_token');
-        return {
-          Authorization: token ? `Bearer ${token}` : '',
-        };
-      },
+    httpLink({
+      url: `${getBaseUrl()}/api/trpc`,
+      transformer: superjson,
     }),
   ],
-  transformer: superjson,
 });
-
-// Create the tRPC React hooks
-export const trpc = createTRPCReact<AppRouter>();

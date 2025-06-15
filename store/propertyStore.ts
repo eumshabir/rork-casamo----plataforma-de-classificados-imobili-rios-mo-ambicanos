@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Property, PropertyFilter } from '@/types/property';
+import { Property, PropertyFilter, PropertyType, ListingType, Amenity } from '@/types/property';
 import { propertyService } from '@/services/propertyService';
 
 interface PropertyState {
@@ -13,7 +13,7 @@ interface PropertyState {
   fetchProperties: () => Promise<void>;
   fetchFeaturedProperties: () => Promise<void>;
   fetchUserProperties: () => Promise<void>;
-  addProperty: (property: Omit<Property, 'id' | 'createdAt' | 'views' | 'owner'>) => Promise<void>;
+  addProperty: (property: Omit<Property, 'id' | 'createdAt' | 'views'>) => Promise<void>;
   updateProperty: (id: string, updates: Partial<Property>) => Promise<void>;
   deleteProperty: (id: string) => Promise<void>;
   toggleFavorite: (id: string) => void;

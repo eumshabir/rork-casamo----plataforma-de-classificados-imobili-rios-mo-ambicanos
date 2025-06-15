@@ -1,6 +1,34 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User } from '@/types/user';
-import { trpcClient } from '@/lib/trpc';
+import { User, UserRole } from '@/types/user';
+import { apiClient } from './api';
+
+// Mock API endpoints
+const MOCK_API_DELAY = 800;
+
+// Mock user database
+const MOCK_USERS = [
+  {
+    id: '1',
+    name: 'João Silva',
+    email: 'joao@example.com',
+    phone: '+258 84 123 4567',
+    password: 'password123',
+    role: 'user' as UserRole,
+    verified: true,
+    createdAt: '2023-01-15T10:30:00Z',
+  },
+  {
+    id: '2',
+    name: 'Maria Costa',
+    email: 'maria@example.com',
+    phone: '+258 82 987 6543',
+    password: 'password123',
+    role: 'premium' as UserRole,
+    verified: true,
+    premiumUntil: '2024-12-31T23:59:59Z',
+    createdAt: '2023-02-20T14:45:00Z',
+  }
+];
 
 // Auth token storage key
 const AUTH_TOKEN_KEY = 'auth_token';
@@ -10,48 +38,175 @@ export const authService = {
   // Email & Password Login
   login: async (email: string, password: string): Promise<{ user: User; token: string }> => {
     try {
-      const response = await trpcClient.auth.login.mutate({ email, password });
+      // Try to use the real API first
+      const response = await apiClient.post('/auth/login', { email, password });
       
       // Store auth data
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.token);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.user));
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.data.token);
+      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data.user));
       
-      return response;
+      return response.data;
     } catch (error) {
-      console.error('Login error:', error);
-      throw new Error('Credenciais inválidas');
+      // Fallback to mock if API is not available
+      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
+      
+      const user = MOCK_USERS.find(u => u.email === email);
+      
+      if (!user || user.password !== password) {
+        throw new Error('Invalid credentials');
+      }
+      
+      const { password: _, ...userWithoutPassword } = user;
+      const token = `mock-token-${Date.now()}`;
+      
+      // Store auth data
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(userWithoutPassword));
+      
+      return { 
+        user: userWithoutPassword as User, 
+        token 
+      };
     }
   },
   
   // Register new user
-  register: async (userData: { name: string; email: string; phone: string; password: string }): Promise<{ user: User; token: string }> => {
+  register: async (userData: Partial<User>, password: string): Promise<{ user: User; token: string }> => {
     try {
-      const response = await trpcClient.auth.register.mutate({
-        name: userData.name,
-        email: userData.email,
-        phone: userData.phone,
-        password: userData.password,
-      });
+      // Try to use the real API first
+      const response = await apiClient.post('/auth/register', { ...userData, password });
       
       // Store auth data
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.token);
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.user));
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.data.token);
+      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data.user));
       
-      return response;
+      return response.data;
     } catch (error) {
-      console.error('Register error:', error);
-      throw new Error('Falha ao criar conta');
+      // Fallback to mock if API is not available
+      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
+      
+      // Check if email already exists
+      if (MOCK_USERS.some(u => u.email === userData.email)) {
+        throw new Error('Email already in use');
+      }
+      
+      // Create new user
+      const newUser = {
+        id: `${MOCK_USERS.length + 1}`,
+        name: userData.name || '',
+        email: userData.email || '',
+        phone: userData.phone || '',
+        password,
+        role: 'user' as UserRole,
+        verified: false,
+        createdAt: new Date().toISOString(),
+      };
+      
+      // In a real app, we would save this to a database
+      MOCK_USERS.push(newUser);
+      
+      const { password: _, ...userWithoutPassword } = newUser;
+      const token = `mock-token-${Date.now()}`;
+      
+      // Store auth data
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(userWithoutPassword));
+      
+      return { 
+        user: userWithoutPassword as User, 
+        token 
+      };
+    }
+  },
+  
+  // Google OAuth login
+  loginWithGoogle: async (): Promise<{ user: User; token: string }> => {
+    try {
+      // Try to use the real API first
+      const response = await apiClient.post('/auth/google');
+      
+      // Store auth data
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.data.token);
+      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data.user));
+      
+      return response.data;
+    } catch (error) {
+      // Fallback to mock if API is not available
+      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
+      
+      // Mock Google auth response
+      const googleUser = {
+        id: 'google-123',
+        name: 'Google User',
+        email: 'google.user@example.com',
+        phone: '',
+        role: 'user' as UserRole,
+        verified: true,
+        createdAt: new Date().toISOString(),
+      };
+      
+      const token = `google-token-${Date.now()}`;
+      
+      // Store auth data
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(googleUser));
+      
+      return { user: googleUser, token };
+    }
+  },
+  
+  // Facebook OAuth login
+  loginWithFacebook: async (): Promise<{ user: User; token: string }> => {
+    try {
+      // Try to use the real API first
+      const response = await apiClient.post('/auth/facebook');
+      
+      // Store auth data
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.data.token);
+      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data.user));
+      
+      return response.data;
+    } catch (error) {
+      // Fallback to mock if API is not available
+      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
+      
+      // Mock Facebook auth response
+      const facebookUser = {
+        id: 'facebook-123',
+        name: 'Facebook User',
+        email: 'facebook.user@example.com',
+        phone: '',
+        role: 'user' as UserRole,
+        verified: true,
+        createdAt: new Date().toISOString(),
+      };
+      
+      const token = `facebook-token-${Date.now()}`;
+      
+      // Store auth data
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(facebookUser));
+      
+      return { user: facebookUser, token };
     }
   },
   
   // Logout
   logout: async (): Promise<void> => {
     try {
-      // Remove local storage items
+      // Try to use the real API first
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+      if (token) {
+        await apiClient.post('/auth/logout', {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+    } catch (error) {
+      // Ignore errors from API
+    } finally {
+      // Always remove local storage items
       await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
       await AsyncStorage.removeItem(USER_DATA_KEY);
-    } catch (error) {
-      console.error('Logout error:', error);
     }
   },
   
@@ -64,30 +219,168 @@ export const authService = {
   // Get current user data
   getCurrentUser: async (): Promise<User | null> => {
     try {
+      // Try to get from API first
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+      if (token) {
+        const response = await apiClient.get('/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        // Update stored user data
+        await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data));
+        return response.data;
+      }
+      return null;
+    } catch (error) {
+      // Fallback to local storage
       const userData = await AsyncStorage.getItem(USER_DATA_KEY);
       return userData ? JSON.parse(userData) : null;
-    } catch (error) {
-      console.error('Get current user error:', error);
-      return null;
     }
   },
   
   // Update user profile
   updateProfile: async (updates: Partial<User>): Promise<User> => {
     try {
+      // Try to use the real API first
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+      if (!token) throw new Error('User not authenticated');
+      
+      const response = await apiClient.put('/users/profile', updates, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Update stored user data
+      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data));
+      return response.data;
+    } catch (error) {
+      // Fallback to mock if API is not available
+      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
+      
       const userData = await AsyncStorage.getItem(USER_DATA_KEY);
       if (!userData) {
-        throw new Error('User not found');
+        throw new Error('User not authenticated');
       }
       
-      const user = JSON.parse(userData);
-      const updatedUser = { ...user, ...updates };
+      const currentUser = JSON.parse(userData);
+      const updatedUser = { ...currentUser, ...updates };
       
+      // Update in mock database
+      const userIndex = MOCK_USERS.findIndex(u => u.id === currentUser.id);
+      if (userIndex >= 0) {
+        MOCK_USERS[userIndex] = { 
+          ...MOCK_USERS[userIndex], 
+          ...updates,
+          password: MOCK_USERS[userIndex].password // Keep the password
+        };
+      }
+      
+      // Update in storage
       await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(updatedUser));
+      
       return updatedUser;
-    } catch (error) {
-      console.error('Update profile error:', error);
-      throw new Error('Falha ao atualizar perfil');
     }
   },
+  
+  // Upgrade to premium
+  upgradeToPremium: async (planDuration: number): Promise<User> => {
+    try {
+      // Try to use the real API first
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+      if (!token) throw new Error('User not authenticated');
+      
+      const response = await apiClient.post('/users/premium', { planDuration }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Update stored user data
+      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(response.data));
+      return response.data;
+    } catch (error) {
+      // Fallback to mock if API is not available
+      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
+      
+      const userData = await AsyncStorage.getItem(USER_DATA_KEY);
+      if (!userData) {
+        throw new Error('User not authenticated');
+      }
+      
+      const currentUser = JSON.parse(userData);
+      
+      // Calculate premium expiration date
+      const premiumUntil = new Date();
+      premiumUntil.setDate(premiumUntil.getDate() + planDuration);
+      
+      const updatedUser = { 
+        ...currentUser, 
+        role: 'premium' as UserRole,
+        premiumUntil: premiumUntil.toISOString()
+      };
+      
+      // Update in mock database
+      const userIndex = MOCK_USERS.findIndex(u => u.id === currentUser.id);
+      if (userIndex >= 0) {
+        MOCK_USERS[userIndex] = { 
+          ...MOCK_USERS[userIndex], 
+          role: 'premium' as UserRole,
+          premiumUntil: premiumUntil.toISOString()
+        };
+      }
+      
+      // Update in storage
+      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(updatedUser));
+      
+      return updatedUser;
+    }
+  },
+  
+  // Verify phone number with SMS code
+  verifyPhone: async (phone: string, code: string): Promise<boolean> => {
+    try {
+      // Try to use the real API first
+      const response = await apiClient.post('/auth/verify-phone', { phone, code });
+      return response.data.success;
+    } catch (error) {
+      // Fallback to mock if API is not available
+      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
+      
+      // Mock verification (always succeeds with code "123456")
+      return code === "123456";
+    }
+  },
+  
+  // Request SMS verification code
+  requestVerificationCode: async (phone: string): Promise<boolean> => {
+    try {
+      // Try to use the real API first
+      const response = await apiClient.post('/auth/request-code', { phone });
+      return response.data.success;
+    } catch (error) {
+      // Fallback to mock if API is not available
+      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
+      
+      // Mock request (always succeeds)
+      return true;
+    }
+  },
+  
+  // Reset password
+  resetPassword: async (email: string): Promise<boolean> => {
+    try {
+      // Try to use the real API first
+      const response = await apiClient.post('/auth/reset-password', { email });
+      return response.data.success;
+    } catch (error) {
+      // Fallback to mock if API is not available
+      await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
+      
+      // Check if email exists
+      const userExists = MOCK_USERS.some(u => u.email === email);
+      if (!userExists) {
+        throw new Error('Email not found');
+      }
+      
+      // Mock reset (always succeeds if email exists)
+      return true;
+    }
+  }
 };

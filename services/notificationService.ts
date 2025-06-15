@@ -1,7 +1,7 @@
+import { apiClient, handleApiError } from './api';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { trpcClient } from '@/lib/trpc';
 
 export interface AppNotification {
   id: string;
@@ -11,6 +11,34 @@ export interface AppNotification {
   read: boolean;
   createdAt: string;
 }
+
+// Mock notifications
+const MOCK_NOTIFICATIONS: AppNotification[] = [
+  {
+    id: 'notif-1',
+    title: 'Novo contacto',
+    body: 'Maria Costa enviou uma mensagem sobre o seu imóvel.',
+    data: { type: 'chat', conversationId: 'conv-1' },
+    read: false,
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'notif-2',
+    title: 'Destaque expirado',
+    body: 'O destaque do seu imóvel "Apartamento T3 na Polana" expirou.',
+    data: { type: 'property', propertyId: '1' },
+    read: true,
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'notif-3',
+    title: 'Pagamento confirmado',
+    body: 'Seu pagamento de 1500 MZN para o plano Premium Mensal foi confirmado.',
+    data: { type: 'payment', paymentId: 'pay-001' },
+    read: true,
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+  }
+];
 
 // Configure Expo Notifications
 Notifications.setNotificationHandler({
@@ -52,7 +80,7 @@ export const notificationService = {
       
       // Register token with backend
       try {
-        await trpcClient.notification.registerDevice.mutate({ token });
+        await apiClient.post('/notifications/register-device', { token });
       } catch (error) {
         console.log('Error registering push token with backend:', error);
       }
@@ -77,55 +105,87 @@ export const notificationService = {
   // Get all notifications for the current user
   getNotifications: async (): Promise<AppNotification[]> => {
     try {
-      const notifications = await trpcClient.notification.getNotifications.query();
-      return notifications;
+      // Try to use the real API first
+      const response = await apiClient.get('/notifications');
+      return response.data;
     } catch (error) {
-      console.error('Error fetching notifications:', error);
-      throw new Error('Falha ao buscar notificações');
+      // If API is not available, use mock
+      await new Promise(resolve => setTimeout(resolve, 800));
+      return MOCK_NOTIFICATIONS;
     }
   },
   
   // Mark a notification as read
   markAsRead: async (notificationId: string): Promise<boolean> => {
     try {
-      const result = await trpcClient.notification.markAsRead.mutate({ notificationId });
-      return result.success;
+      // Try to use the real API first
+      await apiClient.put(`/notifications/${notificationId}/read`);
+      return true;
     } catch (error) {
-      console.error('Error marking notification as read:', error);
-      throw new Error('Falha ao marcar notificação como lida');
+      // If API is not available, use mock
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Update mock data
+      const notificationIndex = MOCK_NOTIFICATIONS.findIndex(n => n.id === notificationId);
+      if (notificationIndex !== -1) {
+        MOCK_NOTIFICATIONS[notificationIndex].read = true;
+      }
+      
+      return true;
     }
   },
   
   // Mark all notifications as read
   markAllAsRead: async (): Promise<boolean> => {
     try {
-      const result = await trpcClient.notification.markAllAsRead.mutate();
-      return result.success;
+      // Try to use the real API first
+      await apiClient.put('/notifications/read-all');
+      return true;
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-      throw new Error('Falha ao marcar todas notificações como lidas');
+      // If API is not available, use mock
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Update mock data
+      MOCK_NOTIFICATIONS.forEach(notification => {
+        notification.read = true;
+      });
+      
+      return true;
     }
   },
   
   // Delete a notification
   deleteNotification: async (notificationId: string): Promise<boolean> => {
     try {
-      const result = await trpcClient.notification.deleteNotification.mutate({ notificationId });
-      return result.success;
+      // Try to use the real API first
+      await apiClient.delete(`/notifications/${notificationId}`);
+      return true;
     } catch (error) {
-      console.error('Error deleting notification:', error);
-      throw new Error('Falha ao excluir notificação');
+      // If API is not available, use mock
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      // Update mock data
+      const notificationIndex = MOCK_NOTIFICATIONS.findIndex(n => n.id === notificationId);
+      if (notificationIndex !== -1) {
+        MOCK_NOTIFICATIONS.splice(notificationIndex, 1);
+      }
+      
+      return true;
     }
   },
   
   // Get unread notification count
   getUnreadCount: async (): Promise<number> => {
     try {
-      const result = await trpcClient.notification.getUnreadCount.query();
-      return result.count;
+      // Try to use the real API first
+      const response = await apiClient.get('/notifications/unread-count');
+      return response.data.count;
     } catch (error) {
-      console.error('Error getting unread count:', error);
-      throw new Error('Falha ao buscar contagem de notificações');
+      // If API is not available, use mock
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Count unread notifications
+      return MOCK_NOTIFICATIONS.filter(n => !n.read).length;
     }
   },
   
@@ -154,11 +214,17 @@ export const notificationService = {
     promotions: boolean
   }): Promise<boolean> => {
     try {
-      const result = await trpcClient.notification.updateSettings.mutate(settings);
-      return result.success;
+      // Try to use the real API first
+      await apiClient.put('/notifications/settings', settings);
+      return true;
     } catch (error) {
-      console.error('Error updating notification settings:', error);
-      throw new Error('Falha ao atualizar configurações de notificações');
+      // If API is not available, use mock
+      await new Promise(resolve => setTimeout(resolve, 600));
+      
+      // Save settings to AsyncStorage
+      await AsyncStorage.setItem('notification_settings', JSON.stringify(settings));
+      
+      return true;
     }
   },
   
@@ -170,12 +236,21 @@ export const notificationService = {
     promotions: boolean
   }> => {
     try {
-      const settings = await trpcClient.notification.getSettings.query();
-      return settings;
+      // Try to use the real API first
+      const response = await apiClient.get('/notifications/settings');
+      return response.data;
     } catch (error) {
-      console.error('Error getting notification settings:', error);
+      // If API is not available, use mock
+      await new Promise(resolve => setTimeout(resolve, 400));
       
-      // Default settings if we can't get from server
+      // Get settings from AsyncStorage
+      const settings = await AsyncStorage.getItem('notification_settings');
+      
+      if (settings) {
+        return JSON.parse(settings);
+      }
+      
+      // Default settings
       return {
         newMessages: true,
         propertyViews: true,

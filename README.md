@@ -1,158 +1,84 @@
-# Real Estate App - Mozambique
+# CasaMoç - Aplicativo de Classificados Imobiliários para Moçambique
 
-A modern real estate application built with React Native, Expo, and tRPC for the Mozambican market.
+CasaMoç é um aplicativo mobile de classificados imobiliários para Moçambique, inspirado no SuperCasa. O aplicativo permite que usuários publiquem, pesquisem e entrem em contato com anunciantes de imóveis.
 
-## Features
+## Funcionalidades Principais
 
-- 🏠 Property listings (apartments, houses, land, commercial)
-- 🔍 Advanced search and filtering
-- 👤 User authentication and profiles
-- ⭐ Premium user features
-- 📱 Cross-platform (iOS, Android, Web)
-- 🗄️ PostgreSQL database
-- 🔐 JWT authentication
-- 🚀 Production-ready backend
+### 1. Cadastro e Login
+- Cadastro por telefone, email ou Google/Facebook
+- Verificação por SMS
+- Dois tipos de conta:
+  - Usuário Comum (Grátis): Pode publicar até 2 imóveis/mês com menos destaque
+  - Usuário Premium (Pago): Pode publicar ilimitado, com selo de destaque, prioridade nas buscas e mais imagens
 
-## Tech Stack
+### 2. Publicação de Imóveis
+- Tipo de imóvel: Casa, Apartamento, Terreno, Escritório, etc.
+- Venda ou arrendamento
+- Localização no mapa
+- Preço, número de quartos, casa de banho, área em m²
+- Upload de fotos
+- Visibilidade: normal ou destaque (para Premium)
 
-- **Frontend**: React Native, Expo
-- **Backend**: Node.js, Hono, tRPC
-- **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: JWT
-- **State Management**: Zustand
-- **Styling**: React Native StyleSheet
+### 3. Sistema de Pagamento
+- Integração com M-Pesa e e-Mola para:
+  - Subir para Premium (mensal, trimestral, anual)
+  - Dar boost (impulsionamento) em um imóvel específico
+  - Comprar pacotes de anúncios
 
-## Setup Instructions
+### 4. Busca e Filtros Avançados
+- Filtro por tipo de imóvel, localização, preço, quartos, casas de banho, área, etc.
+- Resultados organizados por "Mais Recentes", "Mais Vistos", "Destaques"
 
-### 1. Database Setup (PostgreSQL)
+### 5. Página do Imóvel
+- Galeria de imagens
+- Mapa da localização
+- Contato direto com anunciante (WhatsApp, ligação, email)
+- Imóveis semelhantes recomendados
 
-#### Option A: Local PostgreSQL
-1. Install PostgreSQL on your machine
-2. Create a new database:
-```sql
-CREATE DATABASE real_estate_db;
+### 6. Painel do Usuário
+- Gerenciar anúncios (editar, ativar/desativar, excluir)
+- Ver estatísticas (visualizações, contatos recebidos)
+- Histórico de pagamentos e status de Premium
+
+## Implementação Técnica
+
+### Frontend
+- React Native com Expo
+- Zustand para gerenciamento de estado
+- AsyncStorage para persistência local
+- Expo Router para navegação
+
+### Backend (Simulado)
+- Serviços mockados para autenticação, propriedades e pagamentos
+- Em uma implementação real, seria usado:
+  - Firebase/Firestore ou
+  - Supabase ou
+  - API REST personalizada com Node.js/Express
+
+### Pagamentos
+- Integração simulada com M-Pesa e e-Mola
+- Em uma implementação real, seria usado:
+  - APIs oficiais dos provedores de pagamento
+  - Gateway de pagamento para Moçambique
+
+## Estrutura do Projeto
+
+```
+/app - Rotas e telas principais
+/components - Componentes reutilizáveis
+/constants - Constantes e configurações
+/hooks - Custom hooks
+/mocks - Dados mockados
+/services - Serviços de API
+/store - Estado global (Zustand)
+/styles - Estilos compartilhados
+/types - Tipos TypeScript
 ```
 
-#### Option B: Cloud PostgreSQL (Recommended for production)
-Use services like:
-- **Supabase** (Free tier available): https://supabase.com
-- **Railway**: https://railway.app
-- **Neon**: https://neon.tech
-- **PlanetScale**: https://planetscale.com
+## Próximos Passos
 
-### 2. Environment Configuration
-
-1. Copy the example environment file:
-```bash
-cp .env.example .env
-```
-
-2. Update `.env` with your database credentials:
-```env
-DATABASE_URL="postgresql://username:password@localhost:5432/real_estate_db"
-JWT_SECRET="your-super-secret-jwt-key-change-this-in-production"
-EXPO_PUBLIC_API_URL="https://your-production-api.com/api"
-```
-
-### 3. Database Migration
-
-1. Install dependencies:
-```bash
-npm install
-```
-
-2. Generate Prisma client:
-```bash
-npx prisma generate
-```
-
-3. Run database migrations:
-```bash
-npx prisma db push
-```
-
-4. (Optional) Seed the database:
-```bash
-npx prisma db seed
-```
-
-### 4. Development
-
-Start the development server:
-```bash
-npm start
-```
-
-### 5. Production Deployment
-
-#### Backend Deployment Options:
-- **Vercel**: Deploy the `/backend` folder
-- **Railway**: Connect your GitHub repo
-- **Heroku**: Use the Heroku CLI
-- **DigitalOcean App Platform**: Deploy from GitHub
-
-#### Frontend Deployment:
-- **Expo EAS Build**: For mobile app stores
-- **Vercel/Netlify**: For web version
-
-## Database Schema
-
-The app uses the following main models:
-- **User**: User accounts with authentication
-- **Property**: Real estate listings
-- **Conversation**: Chat between users
-- **Message**: Individual chat messages
-- **Notification**: Push notifications
-- **Payment**: Payment history
-- **Favorite**: User's favorite properties
-
-## API Endpoints
-
-The tRPC API provides the following routes:
-
-### Authentication
-- `auth.login` - User login
-- `auth.register` - User registration
-
-### Properties
-- `property.getProperties` - Get all properties with filters
-- `property.getFeaturedProperties` - Get featured properties
-- `property.getUserProperties` - Get user's properties
-- `property.getPropertyById` - Get property details
-- `property.createProperty` - Create new property
-- `property.updateProperty` - Update property
-- `property.deleteProperty` - Delete property
-
-### Users
-- `user.getById` - Get user by ID
-- `user.getUsers` - Get all users (admin only)
-- `user.setPremium` - Set user premium status (admin only)
-
-## Admin Features
-
-To make a user an admin:
-1. Connect to your database
-2. Update the user's role:
-```sql
-UPDATE users SET role = 'admin' WHERE email = 'admin@example.com';
-```
-
-## Security Notes
-
-- Always use strong JWT secrets in production
-- Use HTTPS for all API endpoints
-- Regularly update dependencies
-- Implement rate limiting for production
-- Use environment variables for sensitive data
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License.
+1. Implementar backend real com Firebase ou Supabase
+2. Integrar APIs reais de pagamento (M-Pesa e e-Mola)
+3. Adicionar funcionalidades de moderação e administração
+4. Implementar notificações push
+5. Adicionar análises e métricas

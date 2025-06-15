@@ -1,37 +1,54 @@
-export type PropertyLocation = {
+export type PropertyType = 'house' | 'apartment' | 'land' | 'office' | 'commercial' | 'warehouse' | 'farm';
+export type ListingType = 'sale' | 'rent';
+export type Amenity = 'pool' | 'garage' | 'garden' | 'security' | 'furnished' | 'aircon' | 'balcony' | 'elevator';
+
+export interface Location {
   province: string;
   city: string;
-  neighborhood: string;
-  address?: string;
+  neighborhood?: string;
   coordinates?: {
     latitude: number;
     longitude: number;
   };
-};
+}
 
-export type PropertyOwner = {
+export interface Owner {
   id: string;
   name: string;
-  phone?: string;
+  phone: string;
   isPremium: boolean;
-};
+}
 
-export type Property = {
+export interface Property {
   id: string;
   title: string;
   description: string;
   price: number;
   currency: string;
-  type: string; // apartment, house, land, commercial
-  listingType: string; // sale, rent
+  type: PropertyType;
+  listingType: ListingType;
   bedrooms?: number;
   bathrooms?: number;
-  area: number; // in square meters
-  location: PropertyLocation;
-  amenities: string[]; // pool, garage, garden, etc.
-  images: string[]; // URLs to images
-  views: number;
-  featured?: boolean;
+  area: number;
+  location: Location;
+  amenities: Amenity[];
+  images: string[];
+  owner: Owner;
+  featured: boolean;
   createdAt: string;
-  owner: PropertyOwner;
-};
+  views: number;
+}
+
+export interface PropertyFilter {
+  type?: PropertyType;
+  listingType?: ListingType;
+  province?: string;
+  city?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minBedrooms?: number;
+  minBathrooms?: number;
+  minArea?: number;
+  maxArea?: number;
+  amenities?: Amenity[];
+}
